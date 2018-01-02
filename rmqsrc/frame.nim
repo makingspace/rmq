@@ -17,10 +17,10 @@ type
 proc `$`*(frame: Frame): string =
   "Frame: $#" % $frame.kind
 
-proc marshal*(header: Frame): Marshaled =
+proc marshal*(header: Frame): string =
   case header.kind
   of fkProtocol:
-    [0.cchar, header.major, header.minor, header.revision]
+    "AMQP" & 0.cchar & header.major & header.minor & header.revision
 
 proc protocolHeader*: Frame = Frame(
   kind: fkProtocol,
