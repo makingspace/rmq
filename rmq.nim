@@ -18,7 +18,7 @@ proc handleWrite(connection: Connection) =
 
 proc handleEvents(connection: Connection) {.async.} =
   let events = connection.events
-  if connection.connected and WRITE in events:
+  if connection.connected and ceWrite in events:
     connection.handleWrite()
 
   # TODO:

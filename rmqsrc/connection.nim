@@ -1,11 +1,11 @@
 import deques, tables, net, options, logging, strutils
 import frame
 
+type ConnectionEvent* = enum
+  ceRead, ceWrite, ceError
+
 const
-  READ* = 0x0001i16
-  WRITE* = 0x0004i16
-  ERROR* = 0x0008i16
-  baseEvents = {READ, ERROR}
+  baseEvents = {ceRead, ceError}
 
 type
   Channel = object
@@ -27,7 +27,7 @@ type
     outboundBuffer: Deque[string]
     frameBuffer: string
     closing: Closing
-    eventState: set[int16]
+    eventState: set[ConnectionEvent]
     parameters: ConnectionParameters
     socket: Option[Socket]
     bytesSent, framesSent: int
@@ -96,10 +96,10 @@ proc flushOutbound(connection: var Connection) =
   ]
 
   if connection.outboundBuffer.len > 0:
-    if WRITE notin connection.eventState:
-      connection.eventState.incl(WRITE)
+    if ceWrite notin connection.eventState:
+      connection.eventState.incl(ceWrite)
       # Update handler
-  elif WRITE in connection.eventState:
+  elif ceWrite in connection.eventState:
     connection.eventState = baseEvents
     # Update handler
 
@@ -112,5 +112,5 @@ proc nextFrame*(connection: Connection): string =
 proc connected*(connection: Connection): bool =
   connection.socket.isSome
 
-proc events*(connection: Connection): set[int16] =
+proc events*(connection: Connection): set[ConnectionEvent] =
   connection.eventState

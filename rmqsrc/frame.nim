@@ -28,4 +28,3 @@ proc protocolHeader*: Frame = Frame(
   minor: VERSION_MINOR,
   revision: VERSION_REVISION
 )
-
