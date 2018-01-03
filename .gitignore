@@ -1,1 +1,9 @@
 nimcache
+
+# binary
+rmq
+
+# vim
+tags
+*.swp
+*.swo
