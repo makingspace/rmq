@@ -1,7 +1,5 @@
 nimcache
-
-# binary
-rmq
+/rmq
 
 # vim
 tags
