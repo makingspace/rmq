@@ -81,7 +81,7 @@ proc sendFrame(connection: var Connection, frame: Frame) =
 
   let marshaled = frame.marshal()
 
-  connection.bytesSent += 1
+  connection.bytesSent += marshaled.len
   connection.framesSent += 1
 
   connection.outboundBuffer.addLast(marshaled)
@@ -114,3 +114,6 @@ proc connected*(connection: Connection): bool =
 
 proc events*(connection: Connection): set[ConnectionEvent] =
   connection.eventState
+
+proc diagnostics*(connection: Connection): tuple[framesSent: int, bytesSent: int] =
+  (connection.framesSent, connection.bytesSent)

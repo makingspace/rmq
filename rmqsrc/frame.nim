@@ -12,7 +12,6 @@ type
     case kind: FrameKind
     of fkProtocol:
       major, minor, revision: cchar
-  Marshaled* = array[4, cchar]
 
 proc `$`*(frame: Frame): string =
   "Frame: $#" % $frame.kind
@@ -20,7 +19,7 @@ proc `$`*(frame: Frame): string =
 proc marshal*(header: Frame): string =
   case header.kind
   of fkProtocol:
-    "AMQP" & 0.cchar & header.major & header.minor & header.revision
+    "AMQP" & 0.char & header.major & header.minor & header.revision
 
 proc protocolHeader*: Frame = Frame(
   kind: fkProtocol,

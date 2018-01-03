@@ -43,3 +43,5 @@ when isMainModule:
   waitFor c.handleEvents()
 
   assert (not c.framesWaiting)
+
+  info "Connection diagnostics: " & $c.diagnostics
