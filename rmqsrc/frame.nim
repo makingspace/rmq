@@ -1,4 +1,5 @@
 import strutils, options, streams, endians
+from spec import Class, Method
 
 const
   VERSION_MAJOR = 0.char
@@ -7,11 +8,30 @@ const
 
 type
   FrameKind = enum
-    fkProtocol
+    fkProtocol = 0,    # TODO cannot be zero since that is the global frame, change this to something else
+    fkMethod = 1,
+    fkHeader = 2,
+    fkBody = 3,
+    fkHeartbeat = 4
+
   Frame* = object of RootObj
     case kind: FrameKind
     of fkProtocol:
       major, minor, revision: cchar
+    of fkMethod:
+      methodClassId: Class
+      MethodId: Method
+      args: string          # TODO specific type
+    of fkHeader:
+      headerClassId: Class
+      bodySize: clong       # TODO change to unsigned
+      propFlags: cshort     # TODO change to unsigned
+      propList: string      # TODO change to unsigned
+    of fkBody:
+      payload: string       # TODO specify type
+    of fkHeartbeat:
+      discard
+
   DecodedFrame* = tuple[consumed: int, frame: Option[Frame]]
   FrameParams = tuple
     frameType: uint8
@@ -25,6 +45,9 @@ proc marshal*(header: Frame): string =
   case header.kind
   of fkProtocol:
     "AMQP" & 0.char & header.major & header.minor & header.revision
+  else:
+    # Not implemented
+    ""
 
 proc initProtocolHeader(major, minor, revision: char): Frame = Frame(
   kind: fkProtocol,

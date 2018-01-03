@@ -1,13 +1,12 @@
 type
-  Class = enum
+  Class* = enum
     cConnection = 10, # work with socket connections
     cChannel = 20,    # work with channels
     cExchange = 30,   # work with exchanges
     cQueue = 40,      # work with exchanges
     cBasic = 50       # work with basic content
 
-type
-  Method = enum
+  Method* = enum
     mStart = 10,      # start connection negotiation
     mStartOk = 11,    # select security mechanism and locale
     mSecure = 20,     # security mechanism challenge
