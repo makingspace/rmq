@@ -6,6 +6,9 @@ const
   VERSION_MINOR = 9.char
   VERSION_REVISION = 1.char
 
+  FRAME_HEADER_SIZE* = 7
+  FRAME_END_SIZE* = 1
+
 type
   FrameKind = enum
     fkProtocol = 0,
@@ -15,17 +18,15 @@ type
     fkHeartbeat = 4
 
   Frame* = object of RootObj
+    channelNumber: int
     case kind: FrameKind
     of fkProtocol:
-      major, minor, revision: cchar
+      major, minor, revision: char
     of fkMethod:
-      methodClassId: Class
-      MethodId: Method
-      args: string          # TODO specific type
+      rpcMethod: Method
     of fkHeader:
-      headerClassId: Class
-      bodySize: clong       # TODO change to unsigned
-      propFlags: cshort     # TODO change to unsigned
+      bodySize: uint32
+      propFlags: uint16
       propList: string      # TODO change to unsigned
     of fkBody:
       payload: string       # TODO specify type
@@ -34,7 +35,7 @@ type
 
   DecodedFrame* = tuple[consumed: int, frame: Option[Frame]]
   FrameParams = tuple
-    frameType: uint8
+    frameKind: FrameKind
     frameChannel: uint16
     frameSize: uint32
 
@@ -56,12 +57,29 @@ proc initProtocolHeader(major, minor, revision: char): Frame = Frame(
   revision: revision
 )
 
+proc initMethod*(channelNumber: int, rpcMethod: Method): Frame = Frame(
+  kind: fkMethod,
+  channelNumber: channelNumber,
+  rpcMethod: rpcMethod
+)
+
+proc initHeader*(channelNumber, bodySize: int, properties: string): Frame = Frame(
+  kind: fkHeader,
+  channelNumber: channelNumber,
+  propList: properties
+)
+
+proc initBody*(channelNumber: int, body: string): Frame = Frame(
+  kind: fkBody,
+  payload: body
+)
+
 proc protocolHeader*: Frame = initProtocolHeader(
   VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION
 )
 
-proc readFrameType(s: Stream): uint8 =
-  result = s.readUInt8
+proc readFrameKind(s: Stream): FrameKind =
+  result = s.readUInt8.FrameKind
 
 proc readChannelNumber(s: Stream): uint16 =
   result = s.readUInt16
@@ -73,10 +91,10 @@ proc readFrameSize(s: Stream): uint32 =
 
 proc readFrameParams(s: Stream): FrameParams =
   let
-    frameType = s.readFrameType
+    frameKind = s.readFrameKind
     channelNumber = s.readChannelNumber
     frameSize = s.readFrameSize
-  (frameType, channelNumber, frameSize)
+  (frameKind, channelNumber, frameSize)
 
 proc decode*(data: string): DecodedFrame =
   if data.startsWith("AMQP"):
@@ -91,6 +109,13 @@ proc decode*(data: string): DecodedFrame =
       result = (0, none Frame)
   else:
     var stringStream = newStringStream(data)
-    let frameParams = readFrameParams(stringStream)
+    let
+      frameParams = readFrameParams(stringStream)
+      frameEnd = FRAME_HEADER_SIZE + frameParams.frameSize.int + FRAME_END_SIZE
     echo "Frame Params", frameParams
-    result = (0, none Frame)
+    if frameEnd > data.len:
+      # We don't have all the data yet.
+      result = (0, none Frame)
+
+    let frameData = data[FRAME_HEADER_SIZE..<frameEnd - 1]
+    echo frameData

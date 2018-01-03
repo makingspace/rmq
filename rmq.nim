@@ -7,7 +7,7 @@ addHandler newConsoleLogger()
 
 proc main(host: string, port: int) =
   var
-    params = (host: host, port: port)
+    params = (host: host, port: port, username: "user", password: "user")
     c = newConnection(params)
 
   connect(c)
