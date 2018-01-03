@@ -1,5 +1,5 @@
 import deques, tables, net, options, logging, strutils, math, sequtils
-import frame, spec
+import frame, spec, decode
 
 type ConnectionEvent* = enum
   ceRead, ceWrite, ceError
@@ -115,7 +115,7 @@ proc processFrame(connection: Connection, frame: Frame) =
   connection.framesReceived += 1
   # TODO: Process frame, I guess.
 
-proc sendMessage(connection: Connection, channelNumber: int, rpcMethod: Method, content: MessageContent) =
+proc sendMessage(connection: Connection, channelNumber: ChannelNumber, rpcMethod: Method, content: MessageContent) =
   let length = content.body.len
   var writeBuf = @[
       initMethod(channelNumber, rpcMethod).marshal(),
@@ -156,7 +156,7 @@ proc sendFrame(connection: Connection, frame: Frame) =
 
   # TODO: Detect backpressure.
   #
-proc sendMethod(connection: Connection, channelNumber: int, rpcMethod: Method, content = none MessageContent) =
+proc sendMethod(connection: Connection, channelNumber: ChannelNumber, rpcMethod: Method, content = none MessageContent) =
   if content.isSome:
     connection.sendMessage(channelNumber, rpcMethod, content.get())
   else:
@@ -179,13 +179,15 @@ proc getCredentials(connection: Connection, frame: Frame): string =
   result = 0.char & connection.parameters.username & 0.char & connection.parameters.password
 
 proc sendConnectionStartOk(connection: Connection, usernamePassword: string) =
-  connection.sendMethod(0, mStartOk)
+  discard
+  # TODO: Implement StartOk Method
+  # connection.sendMethod(0.ChannelNumber, startOk)
 
 # Callbacks
 #
 proc onConnectionStart(connection: Connection, methodFrame: Frame) =
   connection.state = csStart
-  connection.sendConnectionStartOk(connection.getCredentials(methodFrame))
+  # connection.sendConnectionStartOk(connection.getCredentials(methodFrame))
 
 proc onConnected(connection: Connection) =
   connection.state = csProtocol
@@ -201,7 +203,7 @@ proc onDataAvailable(connection: Connection, data: string) =
     connection.trimFrameBuffer(bytesDecoded)
     connection.processFrame(frame.get())
 
-proc getMethodCallback(cm: Method): proc(c: Connection, f: Frame) =
+proc getMethodCallback(cm: MethodId): proc(c: Connection, f: Frame) =
   case cm
   of mStart: result = onConnectionStart
   else:
