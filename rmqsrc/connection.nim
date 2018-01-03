@@ -6,6 +6,7 @@ type ConnectionEvent* = enum
 
 const
   baseEvents = {ceRead, ceError}
+  FRAME_MAX_SIZE = 131072
 
 type
   Channel = object
@@ -30,21 +31,25 @@ type
     eventState: set[ConnectionEvent]
     parameters: ConnectionParameters
     socket: Option[Socket]
-    bytesSent, framesSent: int
+    bytesSent, framesSent, bytesReceived, framesReceived: int
+
+  ConnectionDiagnostics = tuple
+    bytesSent, framesSent, bytesReceived, framesReceived: int
+
 
 proc `$`(connection: Connection): string =
   "AMQP $#:$#" % [connection.parameters.host, $connection.parameters.port]
 
-proc connect*(connection: var Connection)
 proc onConnected(connection: var Connection)
+proc onDataAvailable(connection: Connection, data: string)
 proc flushOutbound(connection: var Connection)
-proc sendFrame(connection: var Connection, frame: Frame)
 
 proc initConnection(connection: var Connection, parameters: ConnectionParameters) =
   connection.eventState = baseEvents
   connection.socket = none(Socket)
   connection.parameters = parameters
   connection.outboundBuffer = initDeque[string]()
+  connection.frameBuffer = ""
 
 proc newConnection*(parameters: ConnectionParameters): Connection =
   result = Connection()
@@ -65,13 +70,39 @@ proc connect*(connection: var Connection) =
     info "Connection to $# failed." % connection.parameters.host
     connection.state = csClosed
 
+# IO
+
 proc send*(connection: Connection, msg: string): bool =
   let socket = connection.socket.get()
   result = socket.trySend(msg)
 
-proc onConnected(connection: var Connection) =
-  connection.state = csProtocol
-  connection.sendFrame(protocolHeader())
+proc recv*(connection: Connection): int =
+  let
+    socket = connection.socket.get()
+    data = socket.recv(FRAME_MAX_SIZE)
+
+  if data == "":
+    error "Socket disconnect on read."
+    quit()
+
+  connection.onDataAvailable(data)
+
+  result = data.len
+
+# Frame handling
+
+proc readFrame(connection: Connection): DecodedFrame =
+  info "$# Reading frame from: $#" % [$connection, connection.frameBuffer]
+  result = connection.frameBuffer.decode()
+
+proc trimFrameBuffer(connection: Connection, length: int) =
+  connection.frameBuffer.delete(0, length - 1)
+  connection.bytesReceived += length
+
+proc processFrame(connection: Connection, frame: Frame) =
+  info "$# Processing frame: $#" % [$connection, $frame]
+  connection.framesReceived += 1
+  # TODO: Process frame, I guess.
 
 proc sendFrame(connection: var Connection, frame: Frame) =
   info "$# Sending $#" % [$connection, $frame]
@@ -103,6 +134,24 @@ proc flushOutbound(connection: var Connection) =
     connection.eventState = baseEvents
     # Update handler
 
+# Callbacks
+
+proc onConnected(connection: var Connection) =
+  connection.state = csProtocol
+  connection.sendFrame(protocolHeader())
+
+proc onDataAvailable(connection: Connection, data: string) =
+  connection.frameBuffer &= data
+  while connection.frameBuffer.len > 0:
+    let (bytesDecoded, frame) = connection.readFrame()
+    if not frame.isSome:
+      return
+
+    connection.trimFrameBuffer(bytesDecoded)
+    connection.processFrame(frame.get())
+
+# Public methods
+
 proc framesWaiting*(connection: Connection): bool =
   connection.outboundBuffer.len > 0
 
@@ -115,5 +164,8 @@ proc connected*(connection: Connection): bool =
 proc events*(connection: Connection): set[ConnectionEvent] =
   connection.eventState
 
-proc diagnostics*(connection: Connection): tuple[framesSent: int, bytesSent: int] =
-  (connection.framesSent, connection.bytesSent)
+proc diagnostics*(connection: Connection): ConnectionDiagnostics =
+  (connection.framesSent,
+   connection.bytesSent,
+   connection.bytesReceived,
+   connection.framesReceived)

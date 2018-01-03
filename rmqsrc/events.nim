@@ -12,16 +12,22 @@ proc handleWrite(connection: Connection) =
         else:
           raise newException(ValueError, "Socket failed.")
   except TimeoutError:
-    info "Socket timeout."
+    info "Socket timeout on write."
+
+proc handleRead(connection: Connection) =
+  try:
+    discard connection.recv()
+  except TimeoutError:
+    info "Socket timeout on read."
+
 
 proc handleEvents*(connection: Connection) {.async.} =
   let events = connection.events
   if connection.connected and ceWrite in events:
     connection.handleWrite()
 
-  # TODO:
-  # if connection.connected and READ in events:
-  #   connection.handleRead()
+  if connection.connected and ceRead in events:
+    connection.handleRead()
 
   # if connection.connected and ERROR in events:
   #   connection.handleError()

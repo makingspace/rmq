@@ -1,5 +1,5 @@
 import asyncdispatch, logging, net
-import rmqsrc/[connection, io]
+import rmqsrc/[connection, events]
 
 addHandler newConsoleLogger()
 
