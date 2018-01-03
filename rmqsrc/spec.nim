@@ -6,7 +6,8 @@ type
     cQueue = 40,      # work with exchanges
     cBasic = 50       # work with basic content
 
-  Method* = enum
+  MethodId* = enum
+    mNull = 0,        # For discriminant
     mStart = 10,      # start connection negotiation
     mStartOk = 11,    # select security mechanism and locale
     mSecure = 20,     # security mechanism challenge
