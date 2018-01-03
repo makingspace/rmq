@@ -1,2 +1,7 @@
 nimcache
 /rmq
+
+# vim
+tags
+*.swp
+*.swo
