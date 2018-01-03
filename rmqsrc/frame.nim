@@ -8,7 +8,7 @@ const
 
 type
   FrameKind = enum
-    fkProtocol = 0,    # TODO cannot be zero since that is the global frame, change this to something else
+    fkProtocol = 0,
     fkMethod = 1,
     fkHeader = 2,
     fkBody = 3,
