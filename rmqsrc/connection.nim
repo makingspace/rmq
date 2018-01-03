@@ -9,6 +9,8 @@ const
   FRAME_MAX_SIZE = 131072
 
 type
+  ConnectionMethod = enum
+    cmStart
   Channel = object
   ChannelTable = TableRef[string, Channel]
   ConnectionState = enum
@@ -92,7 +94,9 @@ proc recv*(connection: Connection): int =
 # Frame handling
 
 proc readFrame(connection: Connection): DecodedFrame =
-  info "$# Reading frame from: $#" % [$connection, connection.frameBuffer]
+  info "$# Reading frame (buffer length: $#)" % [
+    $connection, $connection.frameBuffer.len
+  ]
   result = connection.frameBuffer.decode()
 
 proc trimFrameBuffer(connection: Connection, length: int) =
@@ -134,7 +138,15 @@ proc flushOutbound(connection: var Connection) =
     connection.eventState = baseEvents
     # Update handler
 
+type Credentials = object
+proc getCredentials(connection: Connection, frame: Frame): Credentials =
+  discard
+
 # Callbacks
+#
+proc onConnectionStart(connection: Connection, methodFrame: Frame) =
+  connection.state = csStart
+  sendConnectionStartOk(connection.getCredentials(methodFrame))
 
 proc onConnected(connection: var Connection) =
   connection.state = csProtocol
@@ -149,6 +161,10 @@ proc onDataAvailable(connection: Connection, data: string) =
 
     connection.trimFrameBuffer(bytesDecoded)
     connection.processFrame(frame.get())
+
+proc getMethodCallback(cm: ConnectionMethod): proc(c: Connection, f: Frame) =
+  case cm
+  of cmStart: onConnectionStart
 
 # Public methods
 

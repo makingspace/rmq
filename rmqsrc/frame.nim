@@ -6,6 +6,9 @@ const
   VERSION_MINOR = 9.char
   VERSION_REVISION = 1.char
 
+  FRAME_HEADER_SIZE = 7
+  FRAME_END_SIZE = 1
+
 type
   FrameKind = enum
     fkProtocol = 0,
@@ -91,6 +94,13 @@ proc decode*(data: string): DecodedFrame =
       result = (0, none Frame)
   else:
     var stringStream = newStringStream(data)
-    let frameParams = readFrameParams(stringStream)
+    let
+      frameParams = readFrameParams(stringStream)
+      frameEnd = FRAME_HEADER_SIZE + frameParams.frameSize.int + FRAME_END_SIZE
     echo "Frame Params", frameParams
-    result = (0, none Frame)
+    if frameEnd > data.len:
+      # We don't have all the data yet.
+      result = (0, none Frame)
+
+    let frameData = data[FRAME_HEADER_SIZE..<frameEnd - 1]
+    echo frameData
