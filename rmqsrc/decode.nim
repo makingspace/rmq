@@ -1,4 +1,5 @@
-import strutils, options, streams, endians, tables
+import strutils, options, streams, endians, tables, sequtils
+import times
 import frame, spec, methods, values
 
 type
@@ -11,19 +12,36 @@ type
 proc readFrameKind(s: Stream): FrameKind =
   result = s.readUInt8.FrameKind
 
-proc readBigEndian16(s: Stream): uint16 =
+proc readBigEndianU16(s: Stream): uint16 =
   result = s.readUInt16
   bigEndian16(addr result, addr result)
 
-proc readChannelNumber(s: Stream): auto = readBigEndian16(s)
+proc readChannelNumber(s: Stream): auto = readBigEndianU16(s)
+
+proc readBigEndian16(s: Stream): int16 =
+  result = s.readInt16
+  bigEndian16(addr result, addr result)
+
 proc readClassId(s: Stream): auto = readBigEndian16(s)
 proc readMethodId(s: Stream): auto = readBigEndian16(s)
 
-proc readBigEndian32(s: Stream): uint32 =
+proc readBigEndianU32(s: Stream): uint32 =
   result = s.readUInt32
   bigEndian32(addr result, addr result)
 
-proc readFrameSize(s: Stream): auto = readBigEndian32(s)
+proc readFrameSize(s: Stream): auto = readBigEndianU32(s)
+
+proc readBigEndian32(s: Stream): int32 =
+  result = s.readInt32
+  bigEndian32(addr result, addr result)
+
+proc readBigEndianU64(s: Stream): uint64 =
+  result = s.readUInt64
+  bigEndian64(addr result, addr result)
+
+proc readBigEndian64(s: Stream): int64 =
+  result = s.readInt64
+  bigEndian64(addr result, addr result)
 
 proc readFrameParams(s: Stream): FrameParams =
   let
@@ -32,79 +50,147 @@ proc readFrameParams(s: Stream): FrameParams =
     frameSize = s.readFrameSize
   (frameKind, channelNumber, frameSize)
 
-proc decodeShortString(data: Stream): string =
-  let length = data.readUInt8.int
-  result = data.readStr(length.int)
-
-proc decodeLongString(data: Stream): string =
-  let length = data.readBigEndian16
-  result = data.readStr(length.int)
-
-proc getValueType(data: Stream): TaggedValue =
-  let
-    valueTypeChr = data.readChar
-
-  result = case valueTypeChr:
-    of 't': (vtBool, 1, 1)
-    of 'b': (vtShortShort, 1, 1)
-    of 'B': (vtShortShortU, 1, 1)
-    of 'U': (vtShort, 2, 1)
-    of 'u': (vtShortU, 2, 1)
-    of 'I': (vtLong, 4, 1)
-    of 'i': (vtLongU, 4, 1)
-    of 'L': (vtLongLong, 8, 1)
-    of 'l': (vtLongLongU, 8, 1)
-    of 'f': (vtFloat, 4, 1)
-    of 'd': (vtDouble, 8, 1)
-    of 'D': (vtDecimal, 4, 1)
-    of 's': (vtShortStr, data.readUInt8.int, 2)
-    of 'S': (vtLongStr, data.readBigEndian32.int, 5)
-    of 'A': (vtArray, data.readBigEndian32.int, 5)
-    of 'T': (vtTimeStamp, 8, 1)
-    of 'F': (vtTable, data.readBigEndian32.int, 5)
-    else: (vtNull, 0, 1)
-
-proc decodeTable(data: Stream): Table[string, ValueNode] =
-  # TODO: For now we do not evaluate table values.
-  result = initTable[string, ValueNode]()
-  let
-    size = data.readBigEndian16.int
+type TaggedValue* = tuple[valueNode: ValueNode, consumed: int]
+proc decodeValue(data: Stream, typeChr: char = 0.chr): ValueNode =
   var
-    subBuffer = data.readStr(size).newStringStream()
-    read = 0
+    valueTypeChr: char
+  if typeChr == 0.chr:
+    valueTypeChr = data.readChar
+  else:
+    valueTypeChr = typeChr
 
-  while read < size:
-    var
-      key = subBuffer.decodeShortString
-      (_, length, consumed) = subBuffer.getValueType
-      value = subBuffer.readStr(length)
+  case valueTypeChr:
+    of 't':
+      result = ValueNode(
+        valueType: vtBool,
+        boolValue: data.readUInt8.bool
+      )
+    of 'b':
+      result = ValueNode(
+        valueType: vtShortShort,
+        shortShortValue: data.readInt8.int
+      )
+    of 'B':
+      result = ValueNode(
+        valueType: vtShortShortU,
+        shortShortUValue: data.readUInt8.int
+      )
+    of 'U':
+      result = ValueNode(
+        valueType: vtShort,
+        shortValue: data.readBigEndian16.int
+      )
+    of 'u':
+      result = ValueNode(
+        valueType: vtShortU,
+        shortUValue: data.readBigEndianU16.int
+      )
+    of 'I':
+      result = ValueNode(
+        valueType: vtLong,
+        longValue: data.readBigEndian32.int
+      )
+    of 'i':
+      result = ValueNode(
+        valueType: vtLongU,
+        longUValue: data.readBigEndianU32.int
+      )
+    of 'L':
+      result = ValueNode(
+        valueType: vtLongLong,
+        longLongValue: data.readBigEndianU64.int
+      )
+    of 'l':
+      result = ValueNode(
+        valueType: vtLongLongU,
+        longLongUValue: data.readBigEndianU64.int
+      )
+    of 'f':
+      result = ValueNode(
+        valueType: vtFloat,
+        floatValue: data.readFloat32.float
+      )
+    of 'd':
+      result = ValueNode(
+        valueType: vtDouble,
+        doubleValue: data.readFloat64
+      )
+    of 'D':
+      result = ValueNode(
+        valueType: vtDecimal,
+        decimalValue: data.readStr(4)
+      )
+    of 's':
+      let length = data.readUInt8.int
+      result = ValueNode(
+        valueType: vtShortStr,
+        shortStrValue: data.readStr(length)
+      )
+    of 'S':
+      let
+        length = data.readBigEndianU32.int
+        longStrValue = data.readStr(length)
+      result = ValueNode(
+        valueType: vtLongStr,
+        longStrValue: longStrValue
+      )
+    of 'A':
+      var
+        length = data.readBigEndianU32.int
+        arrayNodeValue = newSeq[ValueNode]()
+        substring = data.readStr(length)
+        substringStream = substring.newStringStream
 
-    read += key.len + 1
-    read += consumed
-    read += length
-    # For now, store all values as undecoded strings.
-    result[key] = initVtLongStrNode(value)
+      while not substringStream.atEnd:
+        let arrayValue = substringStream.decodeValue
+        arrayNodeValue.add(arrayValue)
+
+      result = ValueNode(
+        valueType: vtArray,
+        arrayValue: arrayNodeValue
+      )
+    of 'T':
+      result = ValueNode(
+        valueType: vtTimeStamp,
+        timeStampValue: data.readBigEndianU64.int.fromUnix
+      )
+    of 'F':
+      let size = data.readBigEndianU32.int
+
+      var
+        subBuffer = data.readStr(size).newStringStream()
+        keys = newSeq[string]()
+        values = newSeq[ValueNode]()
+
+      while not subBuffer.atEnd:
+        var
+          key = subBuffer.decodeValue(typeChr = 's')
+          valueNode = subBuffer.decodeValue
+
+        keys.add(key.shortStrValue)
+        values.add(valueNode)
+
+      result = ValueNode(
+        valueType: vtTable,
+        keys: keys,
+        values: values
+      )
+    else:
+      result = ValueNode(valueType: vtNull)
 
 proc decodeConnectionStart(data: Stream): Method =
   let
     versionMajor = data.readUInt8
     versionMinor = data.readUInt8
-
-  data.setPosition(data.getPosition + 2)
-  let serverProperties = data.decodeTable
-
-  data.setPosition(data.getPosition + 2)
-  let
-    mechanismsLength = data.readBigEndian16.int
+    serverProperties = data.decodeValue(typeChr = 'F')
+    serverPropertiesTable = zip(serverProperties.keys, serverProperties.values).toTable
+    mechanismsLength = data.readBigEndian32.int
     mechanisms = data.readStr(mechanismsLength)
-
-  data.setPosition(data.getPosition + 2)
-  let
-    localesLength = data.readBigEndian16.int
+    localesLength = data.readBigEndian32.int
     locales = data.readStr(localesLength)
 
   result = initMethodStart(
-    versionMajor, versionMinor, serverProperties, mechanisms, locales
+    versionMajor, versionMinor, serverPropertiesTable, mechanisms, locales
   )
 
 proc decodeMethod(data: Stream): Method =

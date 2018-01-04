@@ -36,6 +36,9 @@ const
     6, 51, 46, 54, 46, 49, 52, 0, 0, 0, 14, 80, 76, 65, 73, 78, 32, 65,
     77, 81, 80, 76, 65, 73, 78, 0, 0, 0, 5, 101, 110, 95, 85, 83, 206
   ].mapIt(it.char).join()
+  serverPropertiesTableSize = 449
+  capabilitiesTableSize = 199
+
 
 suite "connection tests":
 
@@ -64,3 +67,4 @@ suite "connection tests":
     check (0, 0, 494, 1) == diagnostics
     check 7 == c.serverProperties.len
     check csStart == c.state
+    check 9 == c.serverProperties["capabilities"].keys.len
