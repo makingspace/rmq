@@ -1,5 +1,5 @@
 import deques, tables, net, options, logging, strutils, math, sequtils
-import frame, spec, decode, methods
+import frame, spec, decode, methods, values
 
 type ConnectionEvent* = enum
   ceRead, ceWrite, ceError
@@ -12,7 +12,7 @@ const
 type
   Channel = object
   ChannelTable = TableRef[string, Channel]
-  ConnectionState = enum
+  ConnectionState* = enum
     csClosed,
     csInit,
     csProtocol,
@@ -29,11 +29,12 @@ type
 
   Closing = tuple[reply_code: int, reason: string]
   Connection* = ref object
-    state: ConnectionState
+    state*: ConnectionState
     outboundBuffer: Deque[string]
     frameBuffer: string
     closing: Closing
     eventState: set[ConnectionEvent]
+    serverProperties*: Table[string, ValueNode]
     parameters: ConnectionParameters
     socket: Option[Socket]
     bytesSent, framesSent, bytesReceived, framesReceived: int
@@ -90,27 +91,10 @@ proc processCallbacks(connection: Connection, frame: Frame): bool =
   case frame.kind
   of fkMethod:
     let callback = getMethodCallback(frame.rpcMethod.kind)
+    callback(connection, frame)
     result = true
   else:
     result = false
-#   def _process_callbacks(self, frame_value):
-#       """Process the callbacks for the frame if the frame is a method frame
-#       and if it has any callbacks pending.
-
-#       :param pika.frame.Method frame_value: The frame to process
-#       :rtype: bool
-
-#       """
-#       if (self._is_method_frame(frame_value) and
-#               self._has_pending_callbacks(frame_value)):
-#           self.callbacks.process(frame_value.channel_number,  # Prefix
-#                                  frame_value.method,  # Key
-#                                  self,  # Caller
-#                                  frame_value)  # Args
-#           return True
-#       return False
-
-# IO
 
 proc send*(connection: Connection, msg: string): bool =
   let socket = connection.socket.get()
@@ -144,7 +128,8 @@ proc trimFrameBuffer(connection: Connection, length: int) =
 proc processFrame(connection: Connection, frame: Frame) =
   info "$# Processing frame: $#" % [$connection, $frame]
   connection.framesReceived += 1
-  # TODO: Process frame, I guess.
+  if connection.processCallbacks(frame):
+    return
 
 proc sendMessage(connection: Connection, channelNumber: ChannelNumber, rpcMethod: Method, content: MessageContent) =
   let length = content.body.len
@@ -218,7 +203,13 @@ proc sendConnectionStartOk(connection: Connection, usernamePassword: string) =
 #
 proc onConnectionStart(connection: Connection, methodFrame: Frame) =
   connection.state = csStart
-  # connection.sendConnectionStartOk(connection.getCredentials(methodFrame))
+  connection.serverProperties = methodFrame.rpcMethod.serverProperties
+  # if self._is_protocol_header_frame(method_frame):
+  #     raise exceptions.UnexpectedFrameError
+  # self._check_for_protocol_mismatch(method_frame)
+  # self._set_server_information(method_frame)
+  # self._add_connection_tune_callback()
+  connection.sendConnectionStartOk(connection.getCredentials(methodFrame))
 
 proc onConnected(connection: Connection) =
   connection.state = csProtocol
@@ -258,4 +249,3 @@ proc diagnostics*(connection: Connection): ConnectionDiagnostics =
    connection.bytesSent,
    connection.bytesReceived,
    connection.framesReceived)
-

@@ -9,3 +9,6 @@ srcDir        = "src"
 # Dependencies
 
 requires "nim >= 0.17.2"
+
+task tests, "Run test suite":
+    exec "nim c -r tests"

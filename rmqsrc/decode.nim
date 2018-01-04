@@ -1,5 +1,5 @@
 import strutils, options, streams, endians, tables
-import frame, spec, methods
+import frame, spec, methods, values
 
 type
   FrameParams = tuple
@@ -39,28 +39,6 @@ proc decodeLongString(data: Stream): string =
   let length = data.readBigEndian16
   result = data.readStr(length.int)
 
-type
-  TaggedValue = tuple[valueType: ValueType, length, consumed: int]
-  ValueType = enum
-    vtNull,
-    vtBool,
-    vtShortShort,
-    vtShortShortU,
-    vtShort,
-    vtShortU,
-    vtLong,
-    vtLongU,
-    vtLongLong,
-    vtLongLongU,
-    vtFloat,
-    vtDouble,
-    vtDecimal,
-    vtShortStr,
-    vtLongStr,
-    vtArray,
-    vtTimeStamp,
-    vtTable,
-
 proc getValueType(data: Stream): TaggedValue =
   let
     valueTypeChr = data.readChar
@@ -85,10 +63,9 @@ proc getValueType(data: Stream): TaggedValue =
     of 'F': (vtTable, data.readBigEndian32.int, 5)
     else: (vtNull, 0, 1)
 
-
-proc decodeTable(data: Stream): Table[string, string] =
+proc decodeTable(data: Stream): Table[string, ValueNode] =
   # TODO: For now we do not evaluate table values.
-  result = initTable[string, string]()
+  result = initTable[string, ValueNode]()
   let
     size = data.readBigEndian16.int
   var
@@ -104,35 +81,37 @@ proc decodeTable(data: Stream): Table[string, string] =
     read += key.len + 1
     read += consumed
     read += length
-    result[key] = value
+    # For now, store all values as undecoded strings.
+    result[key] = initVtLongStrNode(value)
+
+proc decodeConnectionStart(data: Stream): Method =
+  let
+    versionMajor = data.readUInt8
+    versionMinor = data.readUInt8
+
+  data.setPosition(data.getPosition + 2)
+  let serverProperties = data.decodeTable
+
+  data.setPosition(data.getPosition + 2)
+  let
+    mechanismsLength = data.readBigEndian16.int
+    mechanisms = data.readStr(mechanismsLength)
+
+  data.setPosition(data.getPosition + 2)
+  let
+    localesLength = data.readBigEndian16.int
+    locales = data.readStr(localesLength)
+
+  result = initMethodStart(
+    versionMajor, versionMinor, serverProperties, mechanisms, locales
+  )
 
 proc decodeMethod(data: Stream): Method =
   let methodId = readMethodId(data).MethodId
   data.setPosition(data.getPosition + 2)
   case methodId
-  of mStart:
-    let
-      versionMajor = data.readUInt8
-      versionMinor = data.readUInt8
-
-    data.setPosition(data.getPosition + 2)
-    let serverProperties = data.decodeTable
-
-    data.setPosition(data.getPosition + 2)
-    let
-      mechanismsLength = data.readBigEndian16.int
-      mechanisms = data.readStr(mechanismsLength)
-
-    data.setPosition(data.getPosition + 2)
-    let
-      localesLength = data.readBigEndian16.int
-      locales = data.readStr(localesLength)
-
-    result = initMethodStart(
-      versionMajor, versionMinor, serverProperties, mechanisms, locales
-    )
-  else:
-    discard
+  of mStart: data.decodeConnectionStart()
+  else: Method()
 
 proc decode*(data: string): DecodedFrame =
   if data.startsWith("AMQP"):
