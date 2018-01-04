@@ -1,4 +1,4 @@
-import unittest, strutils, sequtils
+import unittest, strutils, sequtils, tables
 import rmqsrc/connection
 
 const
@@ -53,6 +53,8 @@ suite "connection tests":
 
     let diagnostics = c.diagnostics
     check (0, 0, 0, 0) == diagnostics
+    check 0 == c.serverProperties.len
+    check csClosed == c.state
 
   test "handle Connection.Start":
     c.onDataAvailable(handShakeStart)
@@ -60,3 +62,5 @@ suite "connection tests":
 
     let diagnostics = c.diagnostics
     check (0, 0, 494, 1) == diagnostics
+    check 7 == c.serverProperties.len
+    check csStart == c.state
