@@ -1,14 +1,6 @@
 import strutils, options, streams, endians, tables
 from methods import Method
-from spec import Class, MethodId, ChannelNumber
-
-const
-  VERSION_MAJOR = 0.char
-  VERSION_MINOR = 9.char
-  VERSION_REVISION = 1.char
-
-  FRAME_HEADER_SIZE* = 7
-  FRAME_END_SIZE* = 1
+from spec import Class, MethodId, ChannelNumber, VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION
 
 type
   FrameKind* = enum

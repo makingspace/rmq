@@ -21,3 +21,14 @@ type
     mClosek = 51,     # confirm a connection close
 
 # TODO add more methods
+
+const
+  VERSION_MAJOR* = 0.char
+  VERSION_MINOR* = 9.char
+  VERSION_REVISION* = 1.char
+
+  FRAME_HEADER_SIZE* = 7
+  FRAME_END_SIZE* = 1
+
+  FRAME_MAX_SIZE* = 131072
+  BODY_MAX_LENGTH* = FRAME_MAX_SIZE - FRAME_HEADER_SIZE - FRAME_END_SIZE

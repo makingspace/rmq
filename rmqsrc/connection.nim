@@ -3,11 +3,7 @@ import frame, spec, decode, methods, values
 
 type ConnectionEvent* = enum
   ceRead, ceWrite, ceError
-
-const
-  baseEvents = {ceRead, ceError}
-  FRAME_MAX_SIZE = 131072
-  BODY_MAX_LENGTH = FRAME_MAX_SIZE - FRAME_HEADER_SIZE - FRAME_END_SIZE
+const baseEvents = {ceRead, ceError}
 
 type
   Channel = object
