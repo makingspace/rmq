@@ -5,9 +5,9 @@ from strutils import parseInt
 
 addHandler newConsoleLogger()
 
-proc main(host: string, port: int) =
+proc main(host: string, port: int, username, password: string) =
   var
-    params = (host: host, port: port, username: "user", password: "user")
+    params = (host: host, port: port, username: username, password: password)
     c = newConnection(params)
 
   connect(c)
@@ -25,6 +25,8 @@ when isMainModule:
   var
     host = "192.168.111.222"
     port = 5672
+    username = "user"
+    password = "password"
 
   for kind, key, value in getopt():
     case kind
@@ -37,4 +39,4 @@ when isMainModule:
     else:
       continue
 
-  main(host, port)
+  main(host, port, username, password)

@@ -1,4 +1,5 @@
 type
+  ChannelNumber* = uint16
   Class* = enum
     cConnection = 10, # work with socket connections
     cChannel = 20,    # work with channels

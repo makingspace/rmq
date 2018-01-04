@@ -1,5 +1,5 @@
 import strutils, options, streams, endians, tables
-import frame, spec
+import frame, spec, methods
 
 type
   FrameParams = tuple
@@ -107,25 +107,30 @@ proc decodeTable(data: Stream): Table[string, string] =
     result[key] = value
 
 proc decodeMethod(data: Stream): Method =
-  result = Method()
   let methodId = readMethodId(data).MethodId
   data.setPosition(data.getPosition + 2)
   case methodId
   of mStart:
-    result.kind = mStart
-    result.versionMajor = data.readUInt8
-    result.versionMinor = data.readUInt8
+    let
+      versionMajor = data.readUInt8
+      versionMinor = data.readUInt8
 
     data.setPosition(data.getPosition + 2)
-    result.serverProperties = data.decodeTable
+    let serverProperties = data.decodeTable
 
     data.setPosition(data.getPosition + 2)
-    let mechanismsLength = data.readBigEndian16.int
-    result.mechanisms = data.readStr(mechanismsLength)
+    let
+      mechanismsLength = data.readBigEndian16.int
+      mechanisms = data.readStr(mechanismsLength)
 
     data.setPosition(data.getPosition + 2)
-    let localesLength = data.readBigEndian16.int
-    result.locales = data.readStr(localesLength)
+    let
+      localesLength = data.readBigEndian16.int
+      locales = data.readStr(localesLength)
+
+    result = initMethodStart(
+      versionMajor, versionMinor, serverProperties, mechanisms, locales
+    )
   else:
     discard
 

@@ -1,5 +1,6 @@
 import strutils, options, streams, endians, tables
-from spec import Class, MethodId
+from methods import Method
+from spec import Class, MethodId, ChannelNumber
 
 const
   VERSION_MAJOR = 0.char
@@ -10,16 +11,6 @@ const
   FRAME_END_SIZE* = 1
 
 type
-  ChannelNumber* = uint16
-  Method* = object
-    case kind*: MethodId
-    of mStart:
-      versionMajor*, versionMinor*: uint16
-      serverProperties*: Table[string, string]
-      mechanisms*, locales*: string
-    else:
-      discard
-
   FrameKind* = enum
     fkProtocol = 0,
     fkMethod = 1,
@@ -29,11 +20,11 @@ type
 
   Frame* = object of RootObj
     channelNumber: ChannelNumber
-    case kind: FrameKind
+    case kind*: FrameKind
     of fkProtocol:
       major, minor, revision: char
     of fkMethod:
-      rpcMethod: Method
+      rpcMethod*: Method
     of fkHeader:
       bodySize: uint32
       propFlags: uint16
