@@ -50,7 +50,12 @@ proc readFrameParams(s: Stream): FrameParams =
     frameSize = s.readFrameSize
   (frameKind, channelNumber, frameSize)
 
-type TaggedValue* = tuple[valueNode: ValueNode, consumed: int]
+proc initSubStream(s: Stream, length: int): Stream =
+  ## Given a number of bytes, consume them from the stream and return a new
+  ## stream made from the resulting string.
+  let substring = s.readStr(length)
+  result = substring.newStringStream
+
 proc decodeValue(data: Stream, typeChr: char = 0.chr): ValueNode =
   var
     valueTypeChr: char
@@ -135,14 +140,14 @@ proc decodeValue(data: Stream, typeChr: char = 0.chr): ValueNode =
         longStrValue: longStrValue
       )
     of 'A':
-      var
-        length = data.readBigEndianU32.int
-        arrayNodeValue = newSeq[ValueNode]()
-        substring = data.readStr(length)
-        substringStream = substring.newStringStream
+      let length = data.readBigEndianU32.int
 
-      while not substringStream.atEnd:
-        let arrayValue = substringStream.decodeValue
+      var
+        substream = data.initSubStream(length)
+        arrayNodeValue = newSeq[ValueNode]()
+
+      while not substream.atEnd:
+        let arrayValue = substream.decodeValue
         arrayNodeValue.add(arrayValue)
 
       result = ValueNode(
@@ -158,14 +163,14 @@ proc decodeValue(data: Stream, typeChr: char = 0.chr): ValueNode =
       let size = data.readBigEndianU32.int
 
       var
-        subBuffer = data.readStr(size).newStringStream()
+        substream = data.initSubStream(size)
         keys = newSeq[string]()
         values = newSeq[ValueNode]()
 
-      while not subBuffer.atEnd:
+      while not substream.atEnd:
         var
-          key = subBuffer.decodeValue(typeChr = 's')
-          valueNode = subBuffer.decodeValue
+          key = substream.decodeValue(typeChr = 's')
+          valueNode = substream.decodeValue
 
         keys.add(key.shortStrValue)
         values.add(valueNode)
@@ -213,9 +218,9 @@ proc decode*(data: string): DecodedFrame =
     except IndexError:
       result = (0, none Frame)
   else:
-    var stringStream = newStringStream(data)
+    var stream = newStringStream(data)
     let
-      (frameKind, frameChannel, frameSize) = readFrameParams(stringStream)
+      (frameKind, frameChannel, frameSize) = readFrameParams(stream)
       frameEnd = FRAME_HEADER_SIZE + frameSize.int + FRAME_END_SIZE
 
     if frameEnd > data.len:
@@ -224,7 +229,7 @@ proc decode*(data: string): DecodedFrame =
 
     case frameKind
     of fkMethod:
-      let decodedMethod = decodeMethod(stringStream)
+      let decodedMethod = decodeMethod(stream)
       result = (frameEnd, some initMethod(frameChannel, decodedMethod))
     else:
       result = (0, none Frame)
