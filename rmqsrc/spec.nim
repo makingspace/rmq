@@ -3,11 +3,11 @@ const FRAME_END* = 206.uint8
 type
   ChannelNumber* = uint16
   Class* = enum
-    cConnection = 10, # work with socket connections
-    cChannel = 20,    # work with channels
-    cExchange = 30,   # work with exchanges
-    cQueue = 40,      # work with exchanges
-    cBasic = 50       # work with basic content
+    cConnection = 10,  # work with socket connections
+    cChannel    = 20,  # work with channels
+    cExchange   = 30,  # work with exchanges
+    cQueue      = 40,  # work with exchanges
+    cBasic      = 50   # work with basic content
 
   MethodId* = enum
     mNull = 0,        # For discriminant
