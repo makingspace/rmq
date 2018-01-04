@@ -11,28 +11,28 @@ type
     fkHeartbeat = 4
 
   Frame* = object of RootObj
-    channelNumber: ChannelNumber
+    channelNumber*: ChannelNumber
     case kind*: FrameKind
     of fkProtocol:
-      major, minor, revision: char
+      major*, minor*, revision*: char
     of fkMethod:
       rpcMethod*: Method
     of fkHeader:
-      bodySize: uint32
-      propFlags: uint16
-      propList: string      # TODO change to unsigned
+      bodySize*: uint32
+      propFlags*: uint16
+      propList*: string      # TODO change to unsigned
     of fkBody:
-      payload: string       # TODO specify type
+      payload*: string       # TODO specify type
     of fkHeartbeat:
       discard
 
 proc `$`*(frame: Frame): string =
   "Frame: $#" % $frame.kind
 
-proc marshal*(header: Frame): string =
-  case header.kind
+proc marshal*(frame: Frame): string =
+  case frame.kind
   of fkProtocol:
-    "AMQP" & 0.char & header.major & header.minor & header.revision
+    "AMQP" & 0.char & frame.major & frame.minor & frame.revision
   else:
     # Not implemented
     ""

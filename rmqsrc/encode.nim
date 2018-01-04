@@ -1,6 +1,5 @@
 import endians, tables
-from frame import FrameKind
-from spec import FRAME_END
+import spec, frame
 
 # Encode basic types
 proc encode(v: uint8): array[0..0, char] =
@@ -47,13 +46,21 @@ proc encode*(v: ConnectionStartOk): seq[char] =
   result.add(v.locale[0].encode())
 
 proc newConnectionStartOk*(clientProps: Table[string, string], mechanism: string = "PLAIN", response: string, locale: string = "en_US"): seq[char] =
-  let m = (index: 0x000A000B.uint32,
+  let m = (index: 0x000A000B.uint32,   # TODO can we specify functions by IDs instead of hardcoding this?
            clientProps: clientProps,
            mechanism: (mechanism, len(mechanism).uint8),
            response: (response, len(response).uint32),
            locale: (locale, len(locale).uint8))
   return m.encode()
 
+
+proc encode*(rpcMethod: Method): seq[char] =
+  result = newSeq[char]()
+  case rpcMethod.kind
+  of mStartOk:
+    result.add(newConnectionStartOk(rpcMethod.serverPropertiesOk, rpcMethod.mechanismsOk, rpcMethod.responseOk, rpcMethod.localesOk))
+  else:
+    discard
 
 # method frame marshalling method
 # TODO probably should move this to frame.nim
@@ -65,6 +72,19 @@ proc encode*(channelNumber: uint16, payload: seq[char]): seq[char] =
   result.add(channelNumber.encode())
   result.add(len(payload).uint32.encode())
   result.add(payload)
+  result.add(FRAME_END.encode())
+
+proc encode*(frame: Frame): seq[char] =
+  result = newSeq[char]()
+  result.add(frame.kind.uint8.encode())
+  result.add(frame.channelNumber.uint16.encode())
+  case frame.kind
+  of fkMethod:
+    let payload = encode(frame.rpcMethod)
+    result.add(len(payload).uint32.encode())
+    result.add(payload)
+  else:
+    raise newException(ValueError, "Cannot encode")
   result.add(FRAME_END.encode())
 
 
