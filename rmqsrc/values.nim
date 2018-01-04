@@ -1,5 +1,5 @@
+import times
 type
-  TaggedValue* = tuple[valueType: ValueType, length, consumed: int]
   ValueType* = enum
     vtNull,
     vtBool,
@@ -24,43 +24,46 @@ type
     case valueType*: ValueType
     of vtNull: discard
     of vtBool:
-      boolValue: bool
+      boolValue*: bool
     of vtShortShort:
-      shortShortValue: int
+      shortShortValue*: int
     of vtShortShortU:
-      shortShortUValue: int
+      shortShortUValue*: int
     of vtShort:
-      shortValue: int
+      shortValue*: int
     of vtShortU:
-      shortUValue: int
+      shortUValue*: int
     of vtLong:
-      longValue: int
+      longValue*: int
     of vtLongU:
-      longUValue: int
+      longUValue*: int
     of vtLongLong:
-      longLongValue: int
+      longLongValue*: int
     of vtLongLongU:
-      longLongUValue: int
+      longLongUValue*: int
     of vtFloat:
-      floatValue: float
+      floatValue*: float
     of vtDouble:
-      doubleValue: float
+      doubleValue*: float
     of vtDecimal:
-      decimalValue: float
+      decimalValue*: string
     of vtShortStr:
-      shortStrValue: string
+      shortStrValue*: string
     of vtLongStr:
-      longStrValue: string
+      longStrValue*: string
     of vtArray:
-      arrayValue: seq[ValueNode]
+      arrayValue*: seq[ValueNode]
     of vtTimeStamp:
-      timeStampValue: string
+      timeStampValue*: Time
     of vtTable:
-      keys: seq[string]
-      values: seq[ValueNode]
+      keys*: seq[string]
+      values*: seq[ValueNode]
 
 proc initVtLongStrNode*(value: string): ValueNode =
   result = ValueNode(
     valueType: vtLongStr,
     longStrValue: value
   )
+
+proc `$`*(valueNode: ValueNode): string =
+  "Value Node " & $valueNode.valueType

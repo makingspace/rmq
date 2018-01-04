@@ -6,7 +6,7 @@ type
   Method* = object
     case kind*: MethodId
     of mStart:
-      versionMajor*, versionMinor*: uint16
+      versionMajor*, versionMinor*: uint8
       serverProperties*: Table[string, ValueNode]
       mechanisms*, locales*: string
     else:
