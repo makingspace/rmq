@@ -15,14 +15,15 @@ proc readBigEndian16(s: Stream): uint16 =
   result = s.readUInt16
   bigEndian16(addr result, addr result)
 
-proc readChannelNumber(s: Stream): uint16 = readBigEndian16(s)
-proc readMethodId(s: Stream): uint32 = readBigEndian16(s)
+proc readChannelNumber(s: Stream): auto = readBigEndian16(s)
+proc readClassId(s: Stream): auto = readBigEndian16(s)
+proc readMethodId(s: Stream): auto = readBigEndian16(s)
 
 proc readBigEndian32(s: Stream): uint32 =
   result = s.readUInt32
   bigEndian32(addr result, addr result)
 
-proc readFrameSize(s: Stream): uint32 = readBigEndian32(s)
+proc readFrameSize(s: Stream): auto = readBigEndian32(s)
 
 proc readFrameParams(s: Stream): FrameParams =
   let
@@ -107,8 +108,9 @@ proc decodeConnectionStart(data: Stream): Method =
   )
 
 proc decodeMethod(data: Stream): Method =
-  let methodId = readMethodId(data).MethodId
-  data.setPosition(data.getPosition + 2)
+  let
+    _ = data.readClassId
+    methodId = data.readMethodId.MethodId
   case methodId
   of mStart: data.decodeConnectionStart()
   else: Method()
