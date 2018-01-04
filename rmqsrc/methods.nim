@@ -9,6 +9,9 @@ type
       versionMajor*, versionMinor*: uint8
       serverProperties*: Table[string, ValueNode]
       mechanisms*, locales*: string
+    of mStartOk:
+      serverPropertiesOk*: Table[string, string]
+      mechanismsOk*, responseOk*, localesOk*: string
     else:
       discard
 

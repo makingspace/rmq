@@ -1,5 +1,5 @@
 import endians, tables, strutils, sequtils
-import spec, frame
+import spec, frame, methods
 
 # Encode basic types
 proc encode(v: uint8): array[0..0, char] =
