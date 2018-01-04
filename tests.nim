@@ -1,5 +1,5 @@
-import unittest, strutils, sequtils, tables
-import rmqsrc/connection
+import unittest, strutils, sequtils, tables, algorithm
+import rmqsrc/connection, rmqsrc/values
 
 const
   handShakeStart = @[
@@ -38,6 +38,14 @@ const
   ].mapIt(it.char).join()
   serverPropertiesTableSize = 449
   capabilitiesTableSize = 199
+  expectedCapabilities = @[
+    "authentication_failure_close", "basic.nack", "connection.blocked",
+    "consumer_cancel_notify", "consumer_priorities", "direct_reply_to",
+    "exchange_exchange_bindings", "per_consumer_qos", "publisher_confirms"
+  ]
+  expectedCapabilitiesValuesTypes = @[
+    vtBool, vtBool, vtBool, vtBool, vtBool, vtBool, vtBool, vtBool, vtBool
+  ]
 
 
 suite "connection tests":
@@ -68,3 +76,5 @@ suite "connection tests":
     check 7 == c.serverProperties.len
     check csStart == c.state
     check 9 == c.serverProperties["capabilities"].keys.len
+    check expectedCapabilities == c.serverProperties["capabilities"].keys.sorted(system.cmp)
+    check expectedCapabilitiesValuesTypes == c.serverProperties["capabilities"].values.mapIt(it.valueType)
