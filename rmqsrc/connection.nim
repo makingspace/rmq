@@ -1,5 +1,5 @@
 import deques, tables, net, options, logging, strutils, math, sequtils
-import frame, spec, decode
+import frame, spec, decode, methods
 
 type ConnectionEvent* = enum
   ceRead, ceWrite, ceError
@@ -50,8 +50,9 @@ proc `$`(connection: Connection): string =
   "AMQP $#:$#" % [connection.parameters.host, $connection.parameters.port]
 
 proc onConnected(connection: Connection)
-proc onDataAvailable(connection: Connection, data: string)
+proc onDataAvailable*(connection: Connection, data: string)
 proc flushOutbound(connection: Connection)
+proc onConnectionStart(connection: Connection, methodFrame: Frame)
 
 proc initConnection(connection: Connection, parameters: ConnectionParameters) =
   connection.eventState = baseEvents
@@ -78,6 +79,36 @@ proc connect*(connection: Connection) =
   except OSError:
     info "Connection to $# failed." % connection.parameters.host
     connection.state = csClosed
+
+proc getMethodCallback(cm: MethodId): proc(c: Connection, f: Frame) =
+  case cm
+  of mStart: result = onConnectionStart
+  else:
+    discard
+
+proc processCallbacks(connection: Connection, frame: Frame): bool =
+  case frame.kind
+  of fkMethod:
+    let callback = getMethodCallback(frame.rpcMethod.kind)
+    result = true
+  else:
+    result = false
+#   def _process_callbacks(self, frame_value):
+#       """Process the callbacks for the frame if the frame is a method frame
+#       and if it has any callbacks pending.
+
+#       :param pika.frame.Method frame_value: The frame to process
+#       :rtype: bool
+
+#       """
+#       if (self._is_method_frame(frame_value) and
+#               self._has_pending_callbacks(frame_value)):
+#           self.callbacks.process(frame_value.channel_number,  # Prefix
+#                                  frame_value.method,  # Key
+#                                  self,  # Caller
+#                                  frame_value)  # Args
+#           return True
+#       return False
 
 # IO
 
@@ -193,23 +224,22 @@ proc onConnected(connection: Connection) =
   connection.state = csProtocol
   connection.sendFrame(protocolHeader())
 
-proc onDataAvailable(connection: Connection, data: string) =
+proc onDataAvailable*(connection: Connection, data: string) =
   connection.frameBuffer &= data
   while connection.frameBuffer.len > 0:
-    let (bytesDecoded, frame) = connection.readFrame()
-    if not frame.isSome:
+    try:
+      let (bytesDecoded, frame) = connection.readFrame()
+      if not frame.isSome:
+        return
+
+      connection.trimFrameBuffer(bytesDecoded)
+      connection.processFrame(frame.get())
+    except IOError:
       return
 
-    connection.trimFrameBuffer(bytesDecoded)
-    connection.processFrame(frame.get())
-
-proc getMethodCallback(cm: MethodId): proc(c: Connection, f: Frame) =
-  case cm
-  of mStart: result = onConnectionStart
-  else:
-    discard
-
 # Public methods
+proc bufferRemaining*(connection: Connection): bool =
+  connection.frameBuffer.len > 0
 
 proc framesWaiting*(connection: Connection): bool =
   connection.outboundBuffer.len > 0
@@ -228,3 +258,4 @@ proc diagnostics*(connection: Connection): ConnectionDiagnostics =
    connection.bytesSent,
    connection.bytesReceived,
    connection.framesReceived)
+
