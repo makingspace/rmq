@@ -1,4 +1,4 @@
-import endians, tables, strutils
+import endians, tables, strutils, sequtils
 import spec, frame
 
 # Encode basic types
@@ -14,9 +14,7 @@ proc encode(v: uint32): array[0..3, char] =
   bigEndian32(addr result, addr v)
 
 proc encode(v: string): seq[char] =
-  result = newSeq[char]()
-  for ch in v:
-    result.add(ch)
+  v.mapIt(it.char)
 
 proc encode(v: Table[string, string]): seq[char] =
   # TODO fill this out, right now we will just assume the table is empty
