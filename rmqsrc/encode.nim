@@ -1,4 +1,4 @@
-import endians, tables
+import endians, tables, strutils
 import spec, frame
 
 # Encode basic types
@@ -53,26 +53,14 @@ proc newConnectionStartOk*(clientProps: Table[string, string], mechanism: string
            locale: (locale, len(locale).uint8))
   return m.encode()
 
-
+# Encode frame components
 proc encode*(rpcMethod: Method): seq[char] =
   result = newSeq[char]()
   case rpcMethod.kind
   of mStartOk:
     result.add(newConnectionStartOk(rpcMethod.serverPropertiesOk, rpcMethod.mechanismsOk, rpcMethod.responseOk, rpcMethod.localesOk))
   else:
-    discard
-
-# method frame marshalling method
-# TODO probably should move this to frame.nim
-proc encode*(channelNumber: uint16, payload: seq[char]): seq[char] =
-  let frameType = fkMethod.uint8
-  
-  result = newSeq[char]()
-  result.add(frameType.encode())
-  result.add(channelNumber.encode())
-  result.add(len(payload).uint32.encode())
-  result.add(payload)
-  result.add(FRAME_END.encode())
+    raise newException(ValueError, "Cannot encode: undefined method of '$#'" % [$rpcMethod.kind])
 
 proc encode*(frame: Frame): seq[char] =
   result = newSeq[char]()
@@ -84,20 +72,31 @@ proc encode*(frame: Frame): seq[char] =
     result.add(len(payload).uint32.encode())
     result.add(payload)
   else:
-    raise newException(ValueError, "Cannot encode")
+    raise newException(ValueError, "Cannot encode: undefined frame kind of '$#'" % [$frame.kind])
   result.add(FRAME_END.encode())
 
+proc marshal*(frame: Frame): string =
+  case frame.kind
+  of fkProtocol:
+    "AMQP" & 0.char & frame.major & frame.minor & frame.revision
+  else:
+    frame.encode().join()
 
 when isMainModule:
   echo encode(uint8(1))
   echo encode(uint16(1))
   echo encode(uint32(1))
   echo encode("hi")
+  echo newConnectionStartOk(initTable[string, string](), "PLAIN", "hi", "en_US")
 
-  let
-    channelNumber = 1.uint16
-    payload = newConnectionStartOk(initTable[string, string](), "PLAIN", "hi", "en_US")
+  var rpcMethod = Method()
 
-  echo payload
-  echo encode(channelNumber, payload)
+  rpcMethod.kind = mStartOk
+  rpcMethod.serverPropertiesOk = initTable[string, string]()
+  rpcMethod.mechanismsOk = "PLAIN"
+  rpcMethod.responseOk = "hi"
+  rpcMethod.localesOk = "en_US"
+
+  let methodFrame = initMethod(1.uint16, rpcMethod)
+  echo methodFrame.marshal()
 

@@ -29,13 +29,6 @@ type
 proc `$`*(frame: Frame): string =
   "Frame: $#" % $frame.kind
 
-proc marshal*(frame: Frame): string =
-  case frame.kind
-  of fkProtocol:
-    "AMQP" & 0.char & frame.major & frame.minor & frame.revision
-  else:
-    # Not implemented
-    ""
 
 proc initProtocolHeader*(major, minor, revision: char): Frame = Frame(
   kind: fkProtocol,

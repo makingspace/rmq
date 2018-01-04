@@ -1,5 +1,5 @@
 import deques, tables, net, options, logging, strutils, math, sequtils
-import frame, spec, decode, methods, values
+import frame, spec, decode, methods, values, encode
 
 type ConnectionEvent* = enum
   ceRead, ceWrite, ceError
