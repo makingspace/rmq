@@ -1,4 +1,6 @@
 import endians, tables
+from frame import FrameKind
+from spec import FRAME_END
 
 # Encode basic types
 proc encode(v: uint8): array[0..0, char] =
@@ -32,13 +34,6 @@ type
     response: (string, uint32) # long string
     locale: (string, uint8)    # short string
 
-proc newConnectionStartOk(clientProps: Table[string, string], mechanism: string = "PLAIN", response: string, locale: string = "en_US"): ConnectionStartOk =
-  return (index: 0x000A000B.uint32,
-          clientProps: clientProps,
-          mechanism: (mechanism, len(mechanism).uint8),
-          response: (response, len(response).uint32),
-          locale: (locale, len(locale).uint8))
-
 proc encode*(v: ConnectionStartOk): seq[char] =
   result = newSeq[char]()
 
@@ -51,10 +46,38 @@ proc encode*(v: ConnectionStartOk): seq[char] =
   result.add(v.locale[1].encode())
   result.add(v.locale[0].encode())
 
+proc newConnectionStartOk*(clientProps: Table[string, string], mechanism: string = "PLAIN", response: string, locale: string = "en_US"): seq[char] =
+  let m = (index: 0x000A000B.uint32,
+           clientProps: clientProps,
+           mechanism: (mechanism, len(mechanism).uint8),
+           response: (response, len(response).uint32),
+           locale: (locale, len(locale).uint8))
+  return m.encode()
+
+
+# method frame marshalling method
+# TODO probably should move this to frame.nim
+proc encode*(channelNumber: uint16, payload: seq[char]): seq[char] =
+  let frameType = fkMethod.uint8
+  
+  result = newSeq[char]()
+  result.add(frameType.encode())
+  result.add(channelNumber.encode())
+  result.add(len(payload).uint32.encode())
+  result.add(payload)
+  result.add(FRAME_END.encode())
+
 
 when isMainModule:
   echo encode(uint8(1))
   echo encode(uint16(1))
   echo encode(uint32(1))
   echo encode("hi")
-  echo encode(newConnectionStartOk(initTable[string, string](), "PLAIN", "hi", "en_US"))
+
+  let
+    channelNumber = 1.uint16
+    payload = newConnectionStartOk(initTable[string, string](), "PLAIN", "hi", "en_US")
+
+  echo payload
+  echo encode(channelNumber, payload)
+

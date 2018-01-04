@@ -1,3 +1,5 @@
+const FRAME_END* = 206.uint8
+
 type
   ChannelNumber* = uint16
   Class* = enum
