@@ -2,6 +2,9 @@ import endians, tables, strutils, sequtils
 import spec, frame, methods, values
 
 # Encode basic types
+proc encode(v: seq[char]): seq[char] =
+  return v
+
 proc encode(v: uint8): array[0..0, char] =
   return [v.char]
 
@@ -27,8 +30,13 @@ proc encode(vnode: ValueNode): seq[char] =
     result.add(encode(vnode.longStrValue.len.uint32))
     result.add(encode(vnode.longStrValue))
   of vtTable:
-    # FIXME: this only works for empty tables
-    result.add(encode(0.uint32))
+    var encodedTable = newSeq[char]()
+    for i in 0 .. vnode.keys.high:
+      encodedTable.add(encode(ValueNode(valueType: vtShortStr, shortStrValue: vnode.keys[i])))
+      encodedTable.add(encode(vnode.keys[i]))
+
+    result.add(encode(encodedTable.len.uint32))
+    result.add(encodedTable)
   else:
     # TODO add more cases
     raise newException(ValueError, "Encode")
@@ -45,9 +53,11 @@ proc encode*(m: Method): seq[char] =
 
   case m.kind
   of mStartOk:
-    let p = m.mStartOkParams
+    let
+      p = m.mStartOkParams
+      t = initVtTableNode(p.serverProperties)
     result.add(encode(
-      ValueNode(valueType: vtTable),       # FIXME only works if table is empty
+      ValueNode(valueType: vtTable, keys: t.keys, values: t.values),
       ValueNode(valueType: vtShortStr, shortStrValue: p.mechanisms),
       ValueNode(valueType: vtLongStr, longStrValue: p.response),
       ValueNode(valueType: vtShortStr, shortStrValue: p.locales)
