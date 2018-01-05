@@ -1,4 +1,4 @@
-import deques, tables, net, options, logging, strutils, math, sequtils
+import deques, tables, net, options, logging, strutils, math, sequtils, asyncnet, asyncdispatch
 import frame, spec, decode, methods, values, encode
 
 type ConnectionEvent* = enum
@@ -32,7 +32,7 @@ type
     eventState: set[ConnectionEvent]
     serverProperties*: Table[string, ValueNode]
     parameters: ConnectionParameters
-    socket: Option[Socket]
+    socket: Option[AsyncSocket]
     bytesSent, framesSent, bytesReceived, framesReceived: int
 
   ConnectionDiagnostics = tuple
@@ -43,8 +43,10 @@ type
     body: string
 
 
-proc `$`(connection: Connection): string =
-  "AMQP $#:$#" % [connection.parameters.host, $connection.parameters.port]
+proc `$`*(connection: Connection): string =
+  "AMQP $#:$# ($#)" % [
+    connection.parameters.host, $connection.parameters.port, $connection.state
+  ]
 
 proc onConnected(connection: Connection)
 proc onDataAvailable*(connection: Connection, data: string)
@@ -53,7 +55,7 @@ proc onConnectionStart(connection: Connection, methodFrame: Frame)
 
 proc initConnection(connection: Connection, parameters: ConnectionParameters) =
   connection.eventState = baseEvents
-  connection.socket = none(Socket)
+  connection.socket = none(AsyncSocket)
   connection.parameters = parameters
   connection.outboundBuffer = initDeque[string]()
   connection.frameBuffer = ""
@@ -64,10 +66,10 @@ proc newConnection*(parameters: ConnectionParameters): Connection =
 
 proc connect*(connection: Connection) =
   connection.state = csInit
-  var socket = newSocket()
+  var socket = newAsyncSocket(buffered = false)
   try:
     info "Connecting to $# on $#" % [connection.parameters.host, $connection.parameters.port]
-    socket.connect(connection.parameters.host, Port(connection.parameters.port))
+    asyncCheck socket.connect(connection.parameters.host, Port(connection.parameters.port))
 
     info "Connected."
     connection.socket = some(socket)
@@ -76,6 +78,12 @@ proc connect*(connection: Connection) =
   except OSError:
     info "Connection to $# failed." % connection.parameters.host
     connection.state = csClosed
+
+proc disconnect*(connection: Connection) =
+  info "$# Disconnecting." % $connection
+  if connection.socket.isSome:
+    connection.socket.get().close()
+  connection.state = csClosed
 
 proc getMethodCallback(cm: MethodId): proc(c: Connection, f: Frame) =
   case cm
@@ -92,20 +100,20 @@ proc processCallbacks(connection: Connection, frame: Frame): bool =
   else:
     result = false
 
-proc send*(connection: Connection, msg: string): bool =
+proc send*(connection: Connection, msg: string) {.async.} =
   let socket = connection.socket.get()
-  result = socket.trySend(msg)
+  asyncCheck socket.send(msg)
 
-proc recv*(connection: Connection): int =
-  let
+proc recv*(connection: Connection): Future[int] {.async.} =
+  var
     socket = connection.socket.get()
-    data = socket.recv(FRAME_MAX_SIZE)
+    data = newString(FRAME_MAX_SIZE)
 
-  if data == "":
-    error "Socket disconnect on read."
-    quit()
-
-  connection.onDataAvailable(data)
+  try:
+    result = await socket.recvInto(addr data[0], FRAME_MAX_SIZE)
+    data.setLen(result)
+  except TimeoutError:
+    discard
 
   result = data.len
 
@@ -240,6 +248,12 @@ proc onDataAvailable*(connection: Connection, data: string) =
       return
 
 # Public methods
+proc scheduleWrite*(connection: Connection) =
+  connection.eventState.incl(ceWrite)
+
+proc clearWrite*(connection: Connection) =
+  connection.eventState.excl(ceWrite)
+
 proc bufferRemaining*(connection: Connection): bool =
   connection.frameBuffer.len > 0
 
@@ -256,7 +270,7 @@ proc events*(connection: Connection): set[ConnectionEvent] =
   connection.eventState
 
 proc diagnostics*(connection: Connection): ConnectionDiagnostics =
-  (connection.framesSent,
-   connection.bytesSent,
+  (connection.bytesSent,
+   connection.framesSent,
    connection.bytesReceived,
    connection.framesReceived)

@@ -1,26 +1,20 @@
 import asyncdispatch, logging, net
-import rmqsrc/[connection, events]
+import rmqsrc/[connections, events]
 import parseopt2
 from strutils import parseInt
 
 addHandler newConsoleLogger()
 
-proc main(host: string, port: int, username, password: string) =
-  var
-    params = (host: host, port: port, username: username, password: password)
-    c = newConnection(params)
+proc run(connection: Connection) {.async.} =
 
-  connect(c)
+  connection.connect()
 
-  assert c.connected
-  assert c.framesWaiting
+  assert connection.connected, "Unable to connect to AMQP server."
+  assert connection.framesWaiting, "Not ready to initiate AMQP protocol."
 
-  waitFor c.handleEvents()
-
-  # TODO reinstate when we have an event loop
-  # assert(not c.framesWaiting)
-
-  info "Connection diagnostics: " & $c.diagnostics
+  while connection.connected and not (connection.state == csClosed):
+    await connection.handleEvents()
+    await sleepAsync 1
 
 when isMainModule:
   var
@@ -40,4 +34,10 @@ when isMainModule:
     else:
       continue
 
-  main(host, port, username, password)
+  let
+    params = (host: host, port: port, username: username, password: password)
+    connection = newConnection(params)
+
+  waitFor connection.run()
+
+  info "Session complete. Diagnostics: ", $connection.diagnostics
