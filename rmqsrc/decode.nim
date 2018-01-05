@@ -200,11 +200,11 @@ proc decodeConnectionStart(data: Stream): Method =
 
 proc decodeMethod(data: Stream): Method =
   let
-    _ = data.readClassId
+    class = data.readClassId.Class
     methodId = data.readMethodId.MethodId
   case methodId
   of mStart: data.decodeConnectionStart()
-  else: Method()
+  else: Method(class: class)
 
 proc decode*(data: string): DecodedFrame =
   if data.startsWith("AMQP"):

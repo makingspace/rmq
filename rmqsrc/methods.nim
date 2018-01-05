@@ -1,9 +1,10 @@
 import tables
-from spec import MethodId, ChannelNumber
+from spec import Class, MethodId, ChannelNumber
 import values
 
 type
   Method* = object
+    class*: Class
     case kind*: MethodId
     of mStart:
       versionMajor*, versionMinor*: uint8
@@ -17,6 +18,7 @@ type
 
 proc initMethodStart*(versionMajor, versionMinor: uint8, serverProperties: Table[string, ValueNode], mechanisms, locales: string): Method =
   result = Method(
+    class: cConnection,
     kind: mStart,
     versionMajor: versionMajor,
     versionMinor: versionMinor,

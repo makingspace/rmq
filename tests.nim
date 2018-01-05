@@ -83,7 +83,7 @@ suite "encoding test":
 
   test "marshall startok method frame":
     var
-      m = Method()
+      m = Method(class: cConnection)
       f = Frame()
 
     m.kind = mStartOk
