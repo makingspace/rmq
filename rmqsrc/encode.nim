@@ -16,6 +16,7 @@ proc encode(v: uint32): array[0..3, char] =
 proc encode(v: string): seq[char] =
   v.mapIt(it.char)
 
+# Encode value nodes
 proc encode(vnode: ValueNode): seq[char] =
   result = newSeq[char]()
   case vnode.valueType
@@ -29,6 +30,7 @@ proc encode(vnode: ValueNode): seq[char] =
     # FIXME: this only works for empty tables
     result.add(encode(0.uint32))
   else:
+    # TODO add more cases
     raise newException(ValueError, "Encode")
 
 # Define encodings method parameters
@@ -38,6 +40,7 @@ type
 const
   paramsLookup: Table[MethodId, MethodParams] = {
     mStartOk: @[("clientProps", vtTable), ("mechanism", vtShortStr), ("response", vtLongStr), ("locale", vtShortStr)]
+    # TODO add more cases
   }.toTable
 
 proc encode*(mid: MethodId, params: varargs[ValueNode]): seq[char] =
@@ -85,22 +88,3 @@ proc marshal*(frame: Frame): string =
     "AMQP" & 0.char & frame.major & frame.minor & frame.revision
   else:
     frame.encode().join()
-
-when isMainModule:
-  echo encode(uint8(1))
-  echo encode(uint16(1))
-  echo encode(uint32(1))
-  echo encode("hi")
-  # echo newConnectionStartOk(initTable[string, string](), "PLAIN", "hi", "en_US")
-
-  var rpcMethod = Method()
-
-  rpcMethod.kind = mStartOk
-  rpcMethod.serverPropertiesOk = initTable[string, string]()
-  rpcMethod.mechanismsOk = "PLAIN"
-  rpcMethod.responseOk = "hi"
-  rpcMethod.localesOk = "en_US"
-
-  let methodFrame = initMethod(1.uint16, rpcMethod)
-  echo methodFrame.marshal()
-
