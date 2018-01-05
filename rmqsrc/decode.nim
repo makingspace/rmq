@@ -214,9 +214,9 @@ proc decode*(data: string): DecodedFrame =
         minor = data[6]
         revision = data[7]
 
-      result = (8, some initProtocolHeader(major, minor, revision))
+      return (8, some initProtocolHeader(major, minor, revision))
     except IndexError:
-      result = (0, none Frame)
+      return (0, none Frame)
   else:
     var stream = newStringStream(data)
     let
@@ -225,11 +225,11 @@ proc decode*(data: string): DecodedFrame =
 
     if frameEnd > data.len:
       # We don't have all the data yet.
-      result = (0, none Frame)
+      return (0, none Frame)
 
     case frameKind
     of fkMethod:
       let decodedMethod = decodeMethod(stream)
-      result = (frameEnd, some initMethod(frameChannel, decodedMethod))
+      return (frameEnd, some initMethod(frameChannel, decodedMethod))
     else:
-      result = (0, none Frame)
+      return (0, none Frame)

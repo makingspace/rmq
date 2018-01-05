@@ -1,33 +1,36 @@
-import asyncdispatch, net, logging
+import asyncdispatch, net, logging, strutils, asyncnet
 import connections
 
-proc handleWrite(connection: Connection) =
-  try:
+proc handleWrite(connection: Connection) {.async.} =
     while connection.framesWaiting:
       let frame = connection.nextFrame()
-      while true:
-        let success = connection.send(frame)
-        if success:
-          break
-        else:
-          raise newException(ValueError, "Socket failed.")
-  except TimeoutError:
-    info "Socket timeout on write."
+      await connection.send(frame)
 
-proc handleRead(connection: Connection) =
+proc handleRead(connection: Connection) {.async.} =
   try:
-    discard connection.recv()
+    asyncCheck connection.recv()
   except TimeoutError:
     info "Socket timeout on read."
 
+proc manageEventState(connection: Connection) =
+  info "$# Managing state. Events: $3 Frames waiting?: $2" % [
+    $connection, $connection.framesWaiting, $connection.events
+  ]
+  if connection.framesWaiting:
+    connection.scheduleWrite()
+  else:
+    connection.clearWrite()
 
 proc handleEvents*(connection: Connection) {.async.} =
   let events = connection.events
   if connection.connected and ceWrite in events:
-    connection.handleWrite()
+    info "$# Handling write." % $connection
+    await connection.handleWrite()
+    connection.manageEventState()
 
   if connection.connected and ceRead in events:
-    connection.handleRead()
+    info "$# Handling read." % $connection
+    await connection.handleRead()
 
   # if connection.connected and ERROR in events:
   #   connection.handleError()

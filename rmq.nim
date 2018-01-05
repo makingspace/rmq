@@ -14,6 +14,7 @@ proc run(connection: Connection) {.async.} =
 
   while connection.connected and not (connection.state == csClosed):
     await connection.handleEvents()
+    await sleepAsync 1
 
 when isMainModule:
   var

@@ -1,5 +1,5 @@
 import unittest, strutils, sequtils, tables, algorithm
-import rmqsrc/connection, rmqsrc/values, rmqsrc/spec, rmqsrc/methods, rmqsrc/frame, rmqsrc/encode
+import rmqsrc/connections, rmqsrc/values, rmqsrc/spec, rmqsrc/methods, rmqsrc/frame, rmqsrc/encode
 
 const
   handShakeStart = @[
