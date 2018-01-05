@@ -1,5 +1,5 @@
 import asyncdispatch, net, logging
-import connection
+import connections
 
 proc handleWrite(connection: Connection) =
   try:

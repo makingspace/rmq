@@ -77,6 +77,12 @@ proc connect*(connection: Connection) =
     info "Connection to $# failed." % connection.parameters.host
     connection.state = csClosed
 
+proc disconnect*(connection: Connection) =
+  info "$# Disconnecting." % $connection
+  if connection.socket.isSome:
+    connection.socket.get().close()
+  connection.state = csClosed
+
 proc getMethodCallback(cm: MethodId): proc(c: Connection, f: Frame) =
   case cm
   of mStart: result = onConnectionStart
@@ -103,7 +109,7 @@ proc recv*(connection: Connection): int =
 
   if data == "":
     error "Socket disconnect on read."
-    quit()
+    connection.disconnect()
 
   connection.onDataAvailable(data)
 
@@ -241,7 +247,7 @@ proc events*(connection: Connection): set[ConnectionEvent] =
   connection.eventState
 
 proc diagnostics*(connection: Connection): ConnectionDiagnostics =
-  (connection.framesSent,
-   connection.bytesSent,
+  (connection.bytesSent,
+   connection.framesSent,
    connection.bytesReceived,
    connection.framesReceived)
