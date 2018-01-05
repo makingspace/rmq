@@ -2,6 +2,9 @@ import endians, tables, strutils, sequtils
 import spec, frame, methods, values
 
 # Encode basic types
+proc encode(v: seq[char]): seq[char] =
+  return v
+
 proc encode(v: uint8): array[0..0, char] =
   return [v.char]
 
@@ -20,53 +23,61 @@ proc encode(v: string): seq[char] =
 proc encode(vnode: ValueNode): seq[char] =
   result = newSeq[char]()
   case vnode.valueType
+  of vtBool:
+    result &= encode(vnode.boolValue.uint8)
   of vtShortStr:
-    result.add(encode(vnode.shortStrValue.len.uint8))
-    result.add(encode(vnode.shortStrValue))
+    result &= encode(vnode.shortStrValue.len.uint8)
+    result &= encode(vnode.shortStrValue)
   of vtLongStr:
-    result.add(encode(vnode.longStrValue.len.uint32))
-    result.add(encode(vnode.longStrValue))
+    result &= encode(vnode.longStrValue.len.uint32)
+    result &= encode(vnode.longStrValue)
   of vtTable:
-    # FIXME: this only works for empty tables
-    result.add(encode(0.uint32))
+    var encodedTable = newSeq[char]()
+    for i in 0 .. vnode.keys.high:
+      encodedTable &= encode(vnode.keys[i].toNode(vtShortStr))
+      encodedTable &= encode(vnode.values[i])
+
+    result &= encode(encodedTable.len.uint32)
+    result &= encodedTable
   else:
     # TODO add more cases
-    raise newException(ValueError, "Encode")
+    raise newException(ValueError, "Cannot encode $#" % [$vnode])
 
 proc encode*(params: varargs[ValueNode]): seq[char] =
-  return params.foldl(concat(a, encode(b)), newSeq[char]())
+  return params.foldl(a & encode(b), newSeq[char]())
 
 # Encode frame components
 proc encode*(m: Method): seq[char] =
   result = newSeq[char]()
 
-  result.add(m.class.uint16.encode())
-  result.add(m.kind.uint16.encode())
+  result &= m.class.uint16.encode()
+  result &= m.kind.uint16.encode()
 
   case m.kind
   of mStartOk:
-    let p = m.mStartOkParams
-    result.add(encode(
-      ValueNode(valueType: vtTable),       # FIXME only works if table is empty
-      ValueNode(valueType: vtShortStr, shortStrValue: p.mechanisms),
-      ValueNode(valueType: vtLongStr, longStrValue: p.response),
-      ValueNode(valueType: vtShortStr, shortStrValue: p.locales)
-    ))
+    let
+      p = m.mStartOkParams
+    result &= encode(
+      p.serverProperties.toNode(),
+      p.mechanisms.toNode(vtShortStr),
+      p.response.toNode(vtLongStr),
+      p.locales.toNode(vtShortStr)
+    )
   else:
     raise newException(ValueError, "Cannot encode: undefined method of '$#'" % [$m.kind])
 
 proc encode*(frame: Frame): seq[char] =
   result = newSeq[char]()
-  result.add(frame.kind.uint8.encode())
-  result.add(frame.channelNumber.uint16.encode())
+  result &= frame.kind.uint8.encode()
+  result &= frame.channelNumber.uint16.encode()
   case frame.kind
   of fkMethod:
     let payload = encode(frame.rpcMethod)
-    result.add(len(payload).uint32.encode())
-    result.add(payload)
+    result &= len(payload).uint32.encode()
+    result &= payload
   else:
     raise newException(ValueError, "Cannot encode: undefined frame kind of '$#'" % [$frame.kind])
-  result.add(FRAME_END.encode())
+  result &= FRAME_END.encode()
 
 proc marshal*(frame: Frame): string =
   case frame.kind

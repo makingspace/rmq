@@ -72,7 +72,7 @@ suite "connection tests":
     check(not c.bufferRemaining)
 
     let diagnostics = c.diagnostics
-    check (0, 0, 494, 1) == diagnostics
+    check (493, 1, 494, 1) == diagnostics
     check 7 == c.serverProperties.len
     check csStart == c.state
     check 9 == c.serverProperties["capabilities"].keys.len
