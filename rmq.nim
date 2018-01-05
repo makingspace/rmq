@@ -17,7 +17,8 @@ proc main(host: string, port: int, username, password: string) =
 
   waitFor c.handleEvents()
 
-  assert(not c.framesWaiting)
+  # TODO reinstate when we have an event loop
+  # assert(not c.framesWaiting)
 
   info "Connection diagnostics: " & $c.diagnostics
 
