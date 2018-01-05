@@ -23,13 +23,14 @@ proc manageEventState(connection: Connection) =
 
 proc handleEvents*(connection: Connection) {.async.} =
   let events = connection.events
+
+  info "$# Handling events: $#" % [$connection, $events]
+
   if connection.connected and ceWrite in events:
-    info "$# Handling write." % $connection
     await connection.handleWrite()
     connection.manageEventState()
 
   if connection.connected and ceRead in events:
-    info "$# Handling read." % $connection
     await connection.handleRead()
 
   # if connection.connected and ERROR in events:
