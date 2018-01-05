@@ -7,12 +7,9 @@ type
     class*: Class
     case kind*: MethodId
     of mStart:
-      versionMajor*, versionMinor*: uint8
-      serverProperties*: Table[string, ValueNode]
-      mechanisms*, locales*: string
+      mStartParams*: tuple[versionMajor, versionMinor: uint8, serverProperties: Table[string, ValueNode], mechanisms, locales: string]
     of mStartOk:
-      serverPropertiesOk*: Table[string, string]
-      mechanismsOk*, responseOk*, localesOk*: string
+      mStartOkParams*: tuple[serverProperties: Table[string, ValueNode], mechanisms, response, locales: string]
     else:
       discard
 
@@ -20,9 +17,5 @@ proc initMethodStart*(versionMajor, versionMinor: uint8, serverProperties: Table
   result = Method(
     class: cConnection,
     kind: mStart,
-    versionMajor: versionMajor,
-    versionMinor: versionMinor,
-    serverProperties: serverProperties,
-    mechanisms: mechanisms,
-    locales: locales
+    mStartParams: (versionMajor, versionMinor, serverProperties, mechanisms, locales)
   )

@@ -87,10 +87,7 @@ suite "encoding test":
       f = Frame()
 
     m.kind = mStartOk
-    m.serverPropertiesOk = initTable[string, string]()
-    m.mechanismsOk = "PLAIN"
-    m.responseOk = "hi"
-    m.localesOk = "en_US"
+    m.mStartOkParams = (initTable[string, ValueNode](),"PLAIN", "hi", "en_US")
 
     f.channelNumber = 1.uint16
     f.kind = fkMethod

@@ -33,39 +33,22 @@ proc encode(vnode: ValueNode): seq[char] =
     # TODO add more cases
     raise newException(ValueError, "Encode")
 
-# Define encodings method parameters
-type 
-  MethodParams = seq[tuple[name: string, valueType: ValueType]]
-
-const
-  paramsLookup: Table[MethodId, MethodParams] = {
-    mStartOk: @[("clientProps", vtTable), ("mechanism", vtShortStr), ("response", vtLongStr), ("locale", vtShortStr)]
-    # TODO add more cases
-  }.toTable
-
-proc encode*(mid: MethodId, params: varargs[ValueNode]): seq[char] =
-  let reqParams = paramsLookup[mid]
-  if reqParams.len != params.len:
-      raise newException(ValueError, "$# arguments required, but only supplied $#" % [$reqParams.len, $params.len])
-
+proc encode*(params: varargs[ValueNode]): seq[char] =
   result = newSeq[char]()
-  for i in 0 .. reqParams.high:
-    if reqParams[i].valueType != params[i].valueType:
-      raise newException(ValueError, "Argument $# ($#) must have value type $#" % [$i, $reqParams[i].name, $params[i].valueType])
-
+  for i in 0 .. params.high:
     result.add(params[i].encode())
 
 # Encode frame components
 proc encode*(m: Method): seq[char] =
-  result = newSeq[char]()
   case m.kind
   of mStartOk:
-    # FIXME only works if table is empty
-    result.add(encode(m.kind,
-                      ValueNode(valueType: vtTable),
-                      ValueNode(valueType: vtShortStr, shortStrValue: m.mechanismsOk),
-                      ValueNode(valueType: vtLongStr, longStrValue: m.responseOk),
-                      ValueNode(valueType: vtShortStr, shortStrValue: m.localesOk)))
+    let p = m.mStartOkParams
+    return encode(
+      ValueNode(valueType: vtTable),       # FIXME only works if table is empty
+      ValueNode(valueType: vtShortStr, shortStrValue: p.mechanisms),
+      ValueNode(valueType: vtLongStr, longStrValue: p.response),
+      ValueNode(valueType: vtShortStr, shortStrValue: p.locales)
+    )
   else:
     raise newException(ValueError, "Cannot encode: undefined method of '$#'" % [$m.kind])
 
