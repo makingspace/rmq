@@ -190,7 +190,7 @@ proc flushOutbound(connection: Connection) =
 proc getCredentials(connection: Connection, frame: Frame): string =
   result = 0.char & connection.parameters.username & 0.char & connection.parameters.password
 
-proc sendConnectionStartOk(connection: Connection, connectionStartFrame: Frame) =
+proc sendConnectionStartOk(connection: Connection, connectionStartFrame: Frame, response: string) =
   var
     connectionStartOkFrame = Frame(
       kind: fkMethod,
@@ -200,7 +200,7 @@ proc sendConnectionStartOk(connection: Connection, connectionStartFrame: Frame) 
         mStartOkParams: (
           connectionStartFrame.rpcMethod.mStartParams.serverProperties,
           connectionStartFrame.rpcMethod.mStartParams.mechanisms,
-          "I connected today!",
+          response,
           connectionStartFrame.rpcMethod.mStartParams.locales
         )
       )
@@ -218,7 +218,9 @@ proc onConnectionStart(connection: Connection, methodFrame: Frame) =
   # self._check_for_protocol_mismatch(method_frame)
   # self._set_server_information(method_frame)
   # self._add_connection_tune_callback()
-  connection.sendConnectionStartOk(methodFrame)
+  
+  # TODO parametrize connection start response string?
+  connection.sendConnectionStartOk(methodFrame, "Connection received")
 
 proc onConnected(connection: Connection) =
   connection.state = csProtocol
