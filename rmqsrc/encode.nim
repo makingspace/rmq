@@ -38,15 +38,20 @@ proc encode*(params: varargs[ValueNode]): seq[char] =
 
 # Encode frame components
 proc encode*(m: Method): seq[char] =
+  result = newSeq[char]()
+
+  result.add(m.class.uint16.encode())
+  result.add(m.kind.uint16.encode())
+
   case m.kind
   of mStartOk:
     let p = m.mStartOkParams
-    return encode(
+    result.add(encode(
       ValueNode(valueType: vtTable),       # FIXME only works if table is empty
       ValueNode(valueType: vtShortStr, shortStrValue: p.mechanisms),
       ValueNode(valueType: vtLongStr, longStrValue: p.response),
       ValueNode(valueType: vtShortStr, shortStrValue: p.locales)
-    )
+    ))
   else:
     raise newException(ValueError, "Cannot encode: undefined method of '$#'" % [$m.kind])
 
