@@ -93,8 +93,6 @@ proc close*(connection: Connection, replyCode = 200, reply_text = "Normal shutdo
   if connection.socket.isSome:
     connection.socket.get().close()
 
-  connection.state = csClosed
-
   if connection.channels.len == 0:
     connection.onCloseReady()
   else:
@@ -102,6 +100,7 @@ proc close*(connection: Connection, replyCode = 200, reply_text = "Normal shutdo
       $connection, $connection.channels.len
     ]
 
+  connection.state = csClosed
   info "$# Closed." % $connection
 
 proc getMethodCallback(cm: MethodId): proc(c: Connection, f: Frame) =
