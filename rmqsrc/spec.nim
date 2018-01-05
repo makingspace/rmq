@@ -1,8 +1,7 @@
-const FRAME_END* = 206.uint8
-
 type
   ChannelNumber* = uint16
   Class* = enum
+    cNull = 0,        # For discriminant
     cConnection = 10, # work with socket connections
     cChannel = 20,    # work with channels
     cExchange = 30,   # work with exchanges
@@ -30,6 +29,7 @@ const
 
   FRAME_HEADER_SIZE* = 7
   FRAME_END_SIZE* = 1
+  FRAME_END* = 206.uint8
 
   FRAME_MAX_SIZE* = 131072
   BODY_MAX_LENGTH* = FRAME_MAX_SIZE - FRAME_HEADER_SIZE - FRAME_END_SIZE
