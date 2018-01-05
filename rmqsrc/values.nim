@@ -61,12 +61,6 @@ type
       keys*: seq[string]
       values*: seq[ValueNode]
 
-proc initVtLongStrNode*(value: string): ValueNode =
-  result = ValueNode(
-    valueType: vtLongStr,
-    longStrValue: value
-  )
-
 proc toNode(v: ValueNode): ValueNode =
   return v
 
