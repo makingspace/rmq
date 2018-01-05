@@ -67,7 +67,20 @@ proc initVtLongStrNode*(value: string): ValueNode =
     longStrValue: value
   )
 
-proc initVtTableNode*(table: Table[string, ValueNode]): ValueNode =
+proc toNode(v: ValueNode): ValueNode =
+  return v
+
+proc toNode*(v: string, vtype: ValueType): ValueNode =
+  result = ValueNode(valueType: vtype)
+  case vtype
+  of vtShortStr:
+    result.shortStrValue = v
+  of vtLongStr:
+    result.longStrValue = v
+  else:
+    raise newException(ValueError, "Cannot transform string to non-string ValueNode")
+
+proc toNode*(table: Table[string, ValueNode]): ValueNode =
   # TODO add grammar checks
   # e.g. keys start with '$', '#', or letters. See 4.2.1 Formal Protocol Grammar for full spec
   result = ValueNode(valueType: vtTable, keys: @[], values: @[])
@@ -75,11 +88,9 @@ proc initVtTableNode*(table: Table[string, ValueNode]): ValueNode =
     result.keys.add(k)
     result.values.add(v)
 
-
 proc `$`*(valueNode: ValueNode): string =
   "Value Node " & $valueNode.valueType
 
-
 # TODO make this a test suite later...
 when isMainModule:
-  echo initVtTableNode({"a": ValueNode(valueType: vtShort, shortValue: 1)}.toTable)
+  echo toNode({"a": ValueNode(valueType: vtShort, shortValue: 1)}.toTable)

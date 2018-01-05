@@ -32,14 +32,14 @@ proc encode(vnode: ValueNode): seq[char] =
   of vtTable:
     var encodedTable = newSeq[char]()
     for i in 0 .. vnode.keys.high:
-      encodedTable.add(encode(ValueNode(valueType: vtShortStr, shortStrValue: vnode.keys[i])))
-      encodedTable.add(encode(vnode.keys[i]))
+      encodedTable.add(encode(vnode.keys[i].toNode(vtShortStr)))
+      encodedTable.add(encode(vnode.values[i]))
 
     result.add(encode(encodedTable.len.uint32))
     result.add(encodedTable)
   else:
     # TODO add more cases
-    raise newException(ValueError, "Encode")
+    raise newException(ValueError, "Cannot encode $#" % [$vnode])
 
 proc encode*(params: varargs[ValueNode]): seq[char] =
   return params.foldl(a & encode(b), newSeq[char]())
@@ -55,12 +55,11 @@ proc encode*(m: Method): seq[char] =
   of mStartOk:
     let
       p = m.mStartOkParams
-      t = initVtTableNode(p.serverProperties)
     result.add(encode(
-      ValueNode(valueType: vtTable, keys: t.keys, values: t.values),
-      ValueNode(valueType: vtShortStr, shortStrValue: p.mechanisms),
-      ValueNode(valueType: vtLongStr, longStrValue: p.response),
-      ValueNode(valueType: vtShortStr, shortStrValue: p.locales)
+      p.serverProperties.toNode(),
+      p.mechanisms.toNode(vtShortStr),
+      p.response.toNode(vtLongStr),
+      p.locales.toNode(vtShortStr)
     ))
   else:
     raise newException(ValueError, "Cannot encode: undefined method of '$#'" % [$m.kind])
