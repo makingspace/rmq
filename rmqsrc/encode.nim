@@ -24,21 +24,21 @@ proc encode(vnode: ValueNode): seq[char] =
   result = newSeq[char]()
   case vnode.valueType
   of vtBool:
-    result.add(encode(vnode.boolValue.uint8))
+    result &= encode(vnode.boolValue.uint8)
   of vtShortStr:
-    result.add(encode(vnode.shortStrValue.len.uint8))
-    result.add(encode(vnode.shortStrValue))
+    result &= encode(vnode.shortStrValue.len.uint8)
+    result &= encode(vnode.shortStrValue)
   of vtLongStr:
-    result.add(encode(vnode.longStrValue.len.uint32))
-    result.add(encode(vnode.longStrValue))
+    result &= encode(vnode.longStrValue.len.uint32)
+    result &= encode(vnode.longStrValue)
   of vtTable:
     var encodedTable = newSeq[char]()
     for i in 0 .. vnode.keys.high:
-      encodedTable.add(encode(vnode.keys[i].toNode(vtShortStr)))
-      encodedTable.add(encode(vnode.values[i]))
+      encodedTable &= encode(vnode.keys[i].toNode(vtShortStr))
+      encodedTable &= encode(vnode.values[i])
 
-    result.add(encode(encodedTable.len.uint32))
-    result.add(encodedTable)
+    result &= encode(encodedTable.len.uint32)
+    result &= encodedTable
   else:
     # TODO add more cases
     raise newException(ValueError, "Cannot encode $#" % [$vnode])
@@ -50,34 +50,34 @@ proc encode*(params: varargs[ValueNode]): seq[char] =
 proc encode*(m: Method): seq[char] =
   result = newSeq[char]()
 
-  result.add(m.class.uint16.encode())
-  result.add(m.kind.uint16.encode())
+  result &= m.class.uint16.encode()
+  result &= m.kind.uint16.encode()
 
   case m.kind
   of mStartOk:
     let
       p = m.mStartOkParams
-    result.add(encode(
+    result &= encode(
       p.serverProperties.toNode(),
       p.mechanisms.toNode(vtShortStr),
       p.response.toNode(vtLongStr),
       p.locales.toNode(vtShortStr)
-    ))
+    )
   else:
     raise newException(ValueError, "Cannot encode: undefined method of '$#'" % [$m.kind])
 
 proc encode*(frame: Frame): seq[char] =
   result = newSeq[char]()
-  result.add(frame.kind.uint8.encode())
-  result.add(frame.channelNumber.uint16.encode())
+  result &= frame.kind.uint8.encode()
+  result &= frame.channelNumber.uint16.encode()
   case frame.kind
   of fkMethod:
     let payload = encode(frame.rpcMethod)
-    result.add(len(payload).uint32.encode())
-    result.add(payload)
+    result &= len(payload).uint32.encode()
+    result &= payload
   else:
     raise newException(ValueError, "Cannot encode: undefined frame kind of '$#'" % [$frame.kind])
-  result.add(FRAME_END.encode())
+  result &= FRAME_END.encode()
 
 proc marshal*(frame: Frame): string =
   case frame.kind
