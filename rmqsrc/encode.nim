@@ -55,13 +55,20 @@ proc encode*(m: Method): seq[char] =
 
   case m.kind
   of mStartOk:
-    let
-      p = m.mStartOkParams
+    let p = m.mStartOkParams
     result &= encode(
       p.serverProperties.toNode(),
       p.mechanisms.toNode(vtShortStr),
       p.response.toNode(vtLongStr),
       p.locales.toNode(vtShortStr)
+    )
+  of mClose:
+    let p = m.mCloseParams
+    result &= encode(
+      p.replyCode.toNode(),
+      p.reason.toNode(),
+      m.class.toNode()
+      m.kind.toNode(),
     )
   else:
     raise newException(ValueError, "Cannot encode: undefined method of '$#'" % [$m.kind])
