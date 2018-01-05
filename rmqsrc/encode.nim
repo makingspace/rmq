@@ -58,8 +58,9 @@ proc encode*(params: varargs[ValueNode]): seq[char] =
 proc encode*(m: Method): seq[char] =
   result = newSeq[char]()
 
-  result &= m.class.uint16.encode()
-  result &= m.kind.uint16.encode()
+  let pair = fromMethod(m.class, m.kind)
+  result &= pair[0].encode()
+  result &= pair[1].encode()
 
   case m.kind
   of mStartOk:
