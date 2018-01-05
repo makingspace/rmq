@@ -8,6 +8,10 @@ proc encode(v: seq[char]): seq[char] =
 proc encode(v: uint8): array[0..0, char] =
   return [v.char]
 
+proc encode(v: int16): array[0..1, char] =
+  var v = v
+  bigEndian16(addr result, addr v)
+
 proc encode(v: uint16): array[0..1, char] =
   var v = v
   bigEndian16(addr result, addr v)
@@ -39,6 +43,10 @@ proc encode(vnode: ValueNode): seq[char] =
 
     result &= encode(encodedTable.len.uint32)
     result &= encodedTable
+  of vtShort:
+    result &= encode(vnode.shortValue.int16)
+  of vtShortU:
+    result &= encode(vnode.shortUValue.uint16)
   else:
     # TODO add more cases
     raise newException(ValueError, "Cannot encode $#" % [$vnode])
@@ -55,13 +63,20 @@ proc encode*(m: Method): seq[char] =
 
   case m.kind
   of mStartOk:
-    let
-      p = m.mStartOkParams
+    let p = m.mStartOkParams
     result &= encode(
       p.serverProperties.toNode(),
       p.mechanisms.toNode(vtShortStr),
       p.response.toNode(vtLongStr),
       p.locales.toNode(vtShortStr)
+    )
+  of mClose:
+    let p = m.mCloseParams
+    result &= encode(
+      p.replyCode.int16,
+      p.reason.toNode(vtShortStr),
+      m.class.uint16,
+      m.kind.uint16
     )
   else:
     raise newException(ValueError, "Cannot encode: undefined method of '$#'" % [$m.kind])

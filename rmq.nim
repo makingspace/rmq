@@ -1,4 +1,4 @@
-import asyncdispatch, logging, net
+import asyncdispatch, logging, net, os
 import rmqsrc/[connections, events]
 import parseopt2
 from strutils import parseInt
@@ -37,6 +37,10 @@ when isMainModule:
   let
     params = (host: host, port: port, username: username, password: password)
     connection = newConnection(params)
+
+  proc closeHandler() {.noconv.} = connection.close()
+
+  setControlCHook(closeHandler)
 
   waitFor connection.run()
 
