@@ -7,7 +7,7 @@ const baseEvents = {ceRead, ceError}
 
 type
   Channel = object
-  ChannelTable = TableRef[string, Channel]
+  ChannelTable = TableRef[int, Channel]
   ConnectionState* = enum
     csClosed,
     csInit,
@@ -23,17 +23,17 @@ type
     username: string
     password: string
 
-  Closing = tuple[reply_code: int, reason: string]
   Connection* = ref object
     state*: ConnectionState
     outboundBuffer: Deque[string]
     frameBuffer: string
-    closing: Closing
+    closingParams: ClosingParams
     eventState: set[ConnectionEvent]
     serverProperties*: Table[string, ValueNode]
     parameters: ConnectionParameters
     socket: Option[AsyncSocket]
     bytesSent, framesSent, bytesReceived, framesReceived: int
+    channels: ChannelTable
 
   ConnectionDiagnostics = tuple
     bytesSent, framesSent, bytesReceived, framesReceived: int
@@ -52,6 +52,7 @@ proc onConnected(connection: Connection)
 proc onDataAvailable*(connection: Connection, data: string)
 proc flushOutbound(connection: Connection)
 proc onConnectionStart(connection: Connection, methodFrame: Frame)
+proc onCloseReady(connection: Connection)
 
 proc initConnection(connection: Connection, parameters: ConnectionParameters) =
   connection.eventState = baseEvents
@@ -59,6 +60,7 @@ proc initConnection(connection: Connection, parameters: ConnectionParameters) =
   connection.parameters = parameters
   connection.outboundBuffer = initDeque[string]()
   connection.frameBuffer = ""
+  connection.channels = newTable[int, Channel]()
 
 proc newConnection*(parameters: ConnectionParameters): Connection =
   result = Connection()
@@ -79,11 +81,28 @@ proc connect*(connection: Connection) =
     info "Connection to $# failed." % connection.parameters.host
     connection.state = csClosed
 
-proc disconnect*(connection: Connection) =
-  info "$# Disconnecting." % $connection
+proc close*(connection: Connection, replyCode = 200, reply_text = "Normal shutdown") =
+  info "$# Closing." % $connection
+
+  # TODO: Close channels
+
+  connection.state = csClosing
+
+  connection.closingParams = (replyCode, reply_text)
+
   if connection.socket.isSome:
     connection.socket.get().close()
+
   connection.state = csClosed
+
+  if connection.channels.len == 0:
+    connection.onCloseReady()
+  else:
+    info "$# Waiting for $# channels to close." % [
+      $connection, $connection.channels.len
+    ]
+
+  info "$# Closed." % $connection
 
 proc getMethodCallback(cm: MethodId): proc(c: Connection, f: Frame) =
   case cm
@@ -175,7 +194,7 @@ proc sendFrame(connection: Connection, frame: Frame) =
   connection.flushOutbound()
 
   # TODO: Detect backpressure.
-  #
+
 proc sendMethod(connection: Connection, channelNumber: ChannelNumber, rpcMethod: Method, content = none MessageContent) =
   if content.isSome:
     connection.sendMessage(channelNumber, rpcMethod, content.get())
@@ -216,8 +235,23 @@ proc sendConnectionStartOk(connection: Connection, connectionStartFrame: Frame, 
 
   connection.sendFrame(connectionStartOkFrame)
 
+proc sendConnectionClose(connection: Connection, params: ClosingParams) =
+  var
+    connectionCloseFrame = Frame(
+      kind: fkMethod,
+      rpcMethod: Method(
+        class: cConnection,
+        kind: mClose,
+        mCloseParams: (
+          params.replyCode, params.reason
+        )
+      )
+    )
+
+  connection.sendFrame(connectionCloseFrame)
+
 # Callbacks
-#
+
 proc onConnectionStart(connection: Connection, methodFrame: Frame) =
   connection.state = csStart
   connection.serverProperties = methodFrame.rpcMethod.mStartParams.serverProperties
@@ -226,7 +260,7 @@ proc onConnectionStart(connection: Connection, methodFrame: Frame) =
   # self._check_for_protocol_mismatch(method_frame)
   # self._set_server_information(method_frame)
   # self._add_connection_tune_callback()
-  
+
   # TODO parametrize connection start response string?
   connection.sendConnectionStartOk(methodFrame, "Connection received")
 
@@ -247,7 +281,14 @@ proc onDataAvailable*(connection: Connection, data: string) =
     except IOError:
       return
 
+proc onCloseReady(connection: Connection) =
+  if connection.state == csClosed:
+    warn "$# Attempted to close closed connection." % $connection
+
+  connection.sendConnectionClose(connection.closingParams)
+
 # Public methods
+
 proc scheduleWrite*(connection: Connection) =
   connection.eventState.incl(ceWrite)
 
@@ -268,6 +309,9 @@ proc connected*(connection: Connection): bool =
 
 proc events*(connection: Connection): set[ConnectionEvent] =
   connection.eventState
+
+proc closed*(connection: Connection): bool =
+  connection.state = csClosed
 
 proc diagnostics*(connection: Connection): ConnectionDiagnostics =
   (connection.bytesSent,
