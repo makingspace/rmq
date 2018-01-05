@@ -53,6 +53,7 @@ proc onDataAvailable*(connection: Connection, data: string)
 proc flushOutbound(connection: Connection)
 proc onConnectionStart(connection: Connection, methodFrame: Frame)
 proc onCloseReady(connection: Connection)
+proc onConnectionCloseOk(connection: Connection, _: Frame)
 
 proc initConnection(connection: Connection, parameters: ConnectionParameters) =
   connection.eventState = baseEvents
@@ -90,9 +91,6 @@ proc close*(connection: Connection, replyCode = 200, reply_text = "Normal shutdo
 
   connection.closingParams = (replyCode, reply_text)
 
-  if connection.socket.isSome:
-    connection.socket.get().close()
-
   if connection.channels.len == 0:
     connection.onCloseReady()
   else:
@@ -100,12 +98,10 @@ proc close*(connection: Connection, replyCode = 200, reply_text = "Normal shutdo
       $connection, $connection.channels.len
     ]
 
-  connection.state = csClosed
-  info "$# Closed." % $connection
-
 proc getMethodCallback(cm: MethodId): proc(c: Connection, f: Frame) =
   case cm
   of mStart: result = onConnectionStart
+  of mCloseOk: result = onConnectionCloseOk
   else:
     discard
 
@@ -133,6 +129,8 @@ proc recv*(connection: Connection): Future[int] {.async.} =
   except TimeoutError:
     discard
 
+  if data.len > 0:
+    connection.onDataAvailable(data)
   result = data.len
 
 # Frame handling
@@ -285,6 +283,14 @@ proc onCloseReady(connection: Connection) =
     warn "$# Attempted to close closed connection." % $connection
 
   connection.sendConnectionClose(connection.closingParams)
+
+proc onConnectionCloseOk(connection: Connection, _: Frame) =
+  if connection.socket.isSome:
+    connection.socket.get().close()
+
+  connection.state = csClosed
+  info "$# Closed." % $connection
+
 
 # Public methods
 

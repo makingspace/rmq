@@ -85,6 +85,18 @@ proc toNode*(table: Table[string, ValueNode]): ValueNode =
     result.keys.add(k)
     result.values.add(v)
 
+converter toNode*(v: int16): ValueNode =
+  result = ValueNode(
+    valueType: vtShort,
+    shortValue: v
+  )
+
+converter toNode*(v: uint16): ValueNode =
+  result = ValueNode(
+    valueType: vtShortU,
+    shortUValue: v.int
+  )
+
 proc `$`*(valueNode: ValueNode): string =
   "Value Node " & $valueNode.valueType
 
