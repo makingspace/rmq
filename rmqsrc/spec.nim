@@ -1,3 +1,5 @@
+const FRAME_END* = 206.uint8
+
 type
   ChannelNumber* = uint16
   Class* = enum
@@ -18,10 +20,9 @@ type
     mOpen = 40,       # open connection to virtual host
     mOpenOk = 41,     # signal that connection is ready
     mClose = 50,      # request a connection close
-    mClosek = 51,     # confirm a connection close
+    mCloseOk = 51     # confirm a connection close
 
 # TODO add more methods
-
 const
   VERSION_MAJOR* = 0.char
   VERSION_MINOR* = 9.char

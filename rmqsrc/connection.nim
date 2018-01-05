@@ -1,5 +1,5 @@
 import deques, tables, net, options, logging, strutils, math, sequtils
-import frame, spec, decode, methods, values
+import frame, spec, decode, methods, values, encode
 
 type ConnectionEvent* = enum
   ceRead, ceWrite, ceError
@@ -199,7 +199,7 @@ proc sendConnectionStartOk(connection: Connection, usernamePassword: string) =
 #
 proc onConnectionStart(connection: Connection, methodFrame: Frame) =
   connection.state = csStart
-  connection.serverProperties = methodFrame.rpcMethod.serverProperties
+  connection.serverProperties = methodFrame.rpcMethod.mStartParams.serverProperties
   # if self._is_protocol_header_frame(method_frame):
   #     raise exceptions.UnexpectedFrameError
   # self._check_for_protocol_mismatch(method_frame)

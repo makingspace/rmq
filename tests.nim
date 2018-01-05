@@ -1,5 +1,5 @@
 import unittest, strutils, sequtils, tables, algorithm
-import rmqsrc/connection, rmqsrc/values
+import rmqsrc/connection, rmqsrc/values, rmqsrc/spec, rmqsrc/methods, rmqsrc/frame, rmqsrc/encode
 
 const
   handShakeStart = @[
@@ -78,3 +78,22 @@ suite "connection tests":
     check 9 == c.serverProperties["capabilities"].keys.len
     check expectedCapabilities == c.serverProperties["capabilities"].keys.sorted(system.cmp)
     check expectedCapabilitiesValuesTypes == c.serverProperties["capabilities"].values.mapIt(it.valueType)
+
+suite "encoding test":
+
+  test "marshall startok method frame":
+    var
+      m = Method(class: cConnection)
+      f = Frame()
+
+    m.kind = mStartOk
+    m.mStartOkParams = (initTable[string, ValueNode](),"PLAIN", "hi", "en_US")
+
+    f.channelNumber = 1.uint16
+    f.kind = fkMethod
+    f.rpcMethod = m
+
+    const byteseq = @['\x01', '\x00', '\x01', '\x00', '\x00', '\x00', '\x1A', '\x00', '\x0A', '\x00', '\x0B', '\x00', '\x00', '\x00', '\x00', '\x05', 'P', 'L', 'A', 'I', 'N', '\x00', '\x00', '\x00', '\x02', 'h', 'i', '\x05', 'e', 'n', '_', 'U', 'S', '\xCE']
+
+    check f.marshal() == byteseq.join()
+
