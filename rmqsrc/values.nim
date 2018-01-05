@@ -70,6 +70,9 @@ proc initVtLongStrNode*(value: string): ValueNode =
 proc toNode(v: ValueNode): ValueNode =
   return v
 
+proc toNode(v: bool): ValueNode =
+  return ValueNode(valueType: vtBool, boolValue: v)
+
 proc toNode*(v: string, vtype: ValueType): ValueNode =
   result = ValueNode(valueType: vtype)
   case vtype

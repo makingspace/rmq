@@ -23,6 +23,8 @@ proc encode(v: string): seq[char] =
 proc encode(vnode: ValueNode): seq[char] =
   result = newSeq[char]()
   case vnode.valueType
+  of vtBool:
+    result.add(encode(vnode.boolValue.uint8))
   of vtShortStr:
     result.add(encode(vnode.shortStrValue.len.uint8))
     result.add(encode(vnode.shortStrValue))
