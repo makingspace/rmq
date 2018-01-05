@@ -34,9 +34,7 @@ proc encode(vnode: ValueNode): seq[char] =
     raise newException(ValueError, "Encode")
 
 proc encode*(params: varargs[ValueNode]): seq[char] =
-  result = newSeq[char]()
-  for i in 0 .. params.high:
-    result.add(params[i].encode())
+  return params.foldl(concat(a, encode(b)), newSeq[char]())
 
 # Encode frame components
 proc encode*(m: Method): seq[char] =
