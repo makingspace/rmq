@@ -54,11 +54,13 @@ let
   METHOD_VALS = toSeq(METHODS.pairs).mapIt((it[1], it[0])).toTable
 
 proc toMethod*(cNum: uint16, mNum: uint16): (Class, MethodId)  =
-  if not METHODS.hasKey((cNum, mNum)):
+  let key = (cnUm, mNum)
+  if key notin METHODS:
     raise newException(KeyError, "No method for Class ID: $# and Method ID: $#" % [$cNum, $mNum])
-  return METHODS[(cNum, mNum)]
+  return METHODS[key]
 
 proc fromMethod*(c: Class, m: MethodId): (uint16, uint16) =
-  if not METHOD_VALS.hasKey((c, m)):
+  let key = (c, m)
+  if key notin METHOD_VALS:
     raise newException(KeyError, "No value for Class: $# and Method: $#" % [$c, $m])
-  return METHOD_VALS[(c, m)]
+  return METHOD_VALS[key]

@@ -203,10 +203,7 @@ proc decodeMethod(data: Stream): Method =
     classNum = data.readClassId
     methodNum = data.readMethodId
 
-  let
-    pair = toMethod(classNum, methodNum)
-    class = pair[0]
-    methodId = pair[1]
+  let (_, methodId) = toMethod(classNum, methodNum)
 
   case methodId
   of mStart: data.decodeConnectionStart()
