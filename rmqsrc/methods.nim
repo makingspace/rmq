@@ -22,3 +22,9 @@ proc initMethodStart*(versionMajor, versionMinor: uint8, serverProperties: Table
     kind: mStart,
     mStartParams: (versionMajor, versionMinor, serverProperties, mechanisms, locales)
   )
+
+proc initMethodCloseOk*(): Method =
+  result = Method(
+    class: cConnection,
+    kind: mCloseOk
+  )

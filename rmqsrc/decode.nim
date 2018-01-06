@@ -198,6 +198,9 @@ proc decodeConnectionStart(data: Stream): Method =
     versionMajor, versionMinor, serverPropertiesTable, mechanisms, locales
   )
 
+proc decodeCloseOk(data: Stream): Method =
+  result = initMethodCloseOk()
+
 proc decodeMethod(data: Stream): Method =
   let
     classNum = data.readClassId
@@ -207,6 +210,7 @@ proc decodeMethod(data: Stream): Method =
 
   case methodId
   of mStart: data.decodeConnectionStart()
+  of mCloseOk: data.decodeCloseOk()
   else: raise newException(ValueError, "Cannot decode Method ID: $#" % [$methodId])
 
 proc decode*(data: string): DecodedFrame =

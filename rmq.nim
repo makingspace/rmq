@@ -21,7 +21,7 @@ when isMainModule:
     host = "192.168.111.222"
     port = 5672
     username = "user"
-    password = "password"
+    password = "user"
 
   for kind, key, value in getopt():
     case kind
