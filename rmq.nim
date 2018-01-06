@@ -31,6 +31,10 @@ when isMainModule:
         host = value
       of "port":
         port = parseInt(value)
+      of "user":
+        username = value
+      of "password":
+        password = value
     else:
       continue
 

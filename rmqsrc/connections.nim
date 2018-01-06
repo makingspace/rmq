@@ -222,8 +222,8 @@ proc sendConnectionStartOk(connection: Connection, connectionStartFrame: Frame, 
         class: cConnection,
         kind: mStartOk,
         mStartOkParams: (
-          connectionStartFrame.rpcMethod.mStartParams.serverProperties,
-          connectionStartFrame.rpcMethod.mStartParams.mechanisms,
+          initTable[string, ValueNode](),   # Default client params is nothing
+          "PLAIN",
           response,
           connectionStartFrame.rpcMethod.mStartParams.locales
         )
@@ -259,7 +259,7 @@ proc onConnectionStart(connection: Connection, methodFrame: Frame) =
   # self._add_connection_tune_callback()
 
   # TODO parametrize connection start response string?
-  connection.sendConnectionStartOk(methodFrame, "Connection received")
+  connection.sendConnectionStartOk(methodFrame, connection.getCredentials(methodFrame))
 
 proc onConnected(connection: Connection) =
   connection.state = csProtocol
