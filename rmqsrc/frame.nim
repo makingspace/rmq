@@ -1,6 +1,7 @@
 import strutils, options, streams, endians, tables
-from methods import Method
-from spec import Class, MethodId, ChannelNumber, VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION
+import methods
+from spec import Class, MethodId, ChannelNumber, VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION, FRAME_END
+import utils.encode
 
 type
   FrameKind* = enum
@@ -27,7 +28,11 @@ type
       discard
 
 proc `$`*(frame: Frame): string =
-  "Frame: $#" % $frame.kind
+  case frame.kind
+  of fkMethod: "Frame $#: $#.$#" % [
+    $frame.kind, $frame.rpcMethod.class, $frame.rpcMethod.kind
+  ]
+  else: "Frame: $#" % $frame.kind
 
 
 proc initProtocolHeader*(major, minor, revision: char): Frame = Frame(
@@ -57,3 +62,23 @@ proc initBody*(channelNumber: ChannelNumber, body: string): Frame = Frame(
 proc protocolHeader*: Frame = initProtocolHeader(
   VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION
 )
+
+proc encode*(frame: Frame): seq[char] =
+  result = newSeq[char]()
+  result &= frame.kind.uint8.encode()
+  result &= frame.channelNumber.uint16.encode()
+  case frame.kind
+  of fkMethod:
+    let payload = encode(frame.rpcMethod)
+    result &= len(payload).uint32.encode()
+    result &= payload
+  else:
+    raise newException(ValueError, "Cannot encode: undefined frame kind of '$#'" % [$frame.kind])
+  result &= FRAME_END.encode()
+
+proc marshal*(frame: Frame): string =
+  case frame.kind
+  of fkProtocol:
+    "AMQP" & 0.char & frame.major & frame.minor & frame.revision
+  else:
+    frame.encode().join()

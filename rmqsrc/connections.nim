@@ -1,5 +1,36 @@
 import deques, tables, net, options, logging, strutils, math, sequtils, asyncnet, asyncdispatch
-import frame, spec, decode, methods, values, encode
+import frame, spec, decode, methods, values
+
+proc negotiateIntegerValue[T](a, b: T): T =
+  if (a == 0) or (b == 0): max(a, b)
+  else: min(a, b)
+
+type ConnectionParameters = object
+  host: string
+  port: int
+  username: string
+  password: string
+  channelMax: uint16
+  frameMax: uint32
+  heartbeat: uint16
+
+proc initConnectionParameters*(
+  host: string, port: int,
+  username = "user",
+  password = "user",
+  channelMax = MAX_CHANNELS,
+  frameMax = FRAME_MAX_SIZE,
+  heartbeat = DEFAULT_HEARTBEAT_TIMEOUT
+): ConnectionParameters =
+  ConnectionParameters(
+    host: host,
+    port: port,
+    username: username,
+    password: password,
+    channelMax: channelMax,
+    frameMax: frameMax,
+    heartbeat: heartbeat
+  )
 
 type ConnectionEvent* = enum
   ceRead, ceWrite, ceError
@@ -9,19 +40,13 @@ type
   Channel = object
   ChannelTable = TableRef[int, Channel]
   ConnectionState* = enum
-    csClosed,
-    csInit,
-    csProtocol,
-    csStart,
-    csTune,
-    csOpen,
-    csClosing
-
-  ConnectionParameters = tuple
-    host: string
-    port: int
-    username: string
-    password: string
+    csClosed = "Closed"
+    csInit = "Init"
+    csProtocol = "Protocol"
+    csStart = "Start"
+    csTune = "Tune"
+    csOpen = "Open"
+    csClosing = "Closing"
 
   Connection* = ref object
     state*: ConnectionState
@@ -52,6 +77,7 @@ proc onConnected(connection: Connection)
 proc onDataAvailable*(connection: Connection, data: string)
 proc flushOutbound(connection: Connection)
 proc onConnectionStart(connection: Connection, methodFrame: Frame)
+proc onConnectionTune(connection: Connection, methodFrame: Frame)
 proc onCloseReady(connection: Connection)
 proc onConnectionCloseOk(connection: Connection, _: Frame)
 
@@ -98,12 +124,14 @@ proc close*(connection: Connection, replyCode = 200, reply_text = "Normal shutdo
       $connection, $connection.channels.len
     ]
 
-proc getMethodCallback(cm: MethodId): proc(c: Connection, f: Frame) =
+type FrameCallback = proc(c: Connection, f: Frame)
+proc methodNoOp(c: Connection, f: Frame) = discard
+proc getMethodCallback(cm: MethodId): FrameCallback =
   case cm
-  of mStart: result = onConnectionStart
-  of mCloseOk: result = onConnectionCloseOk
-  else:
-    discard
+  of mStart: onConnectionStart
+  of mCloseOk: onConnectionCloseOk
+  of mTune: onConnectionTune
+  else: methodNoOp
 
 proc processCallbacks(connection: Connection, frame: Frame): bool =
   case frame.kind
@@ -124,7 +152,7 @@ proc recv*(connection: Connection): Future[int] {.async.} =
     data = newString(FRAME_MAX_SIZE)
 
   try:
-    result = await socket.recvInto(addr data[0], FRAME_MAX_SIZE)
+    result = await socket.recvInto(addr data[0], FRAME_MAX_SIZE.int)
     data.setLen(result)
   except TimeoutError:
     discard
@@ -152,17 +180,19 @@ proc processFrame(connection: Connection, frame: Frame) =
     return
 
 proc sendMessage(connection: Connection, channelNumber: ChannelNumber, rpcMethod: Method, content: MessageContent) =
-  let length = content.body.len
+  let
+    length = content.body.len
+    bodyMaxLength = BODY_MAX_LENGTH.int
   var writeBuf = @[
       initMethod(channelNumber, rpcMethod).marshal(),
       initHeader(channelNumber, length, content.properties).marshal()
     ]
   if length > 0:
-    let chunks = (length / BODY_MAX_LENGTH).ceil.int
+    let chunks = (length / bodyMaxLength).ceil.int
     for chunk in 0..<chunks:
       var
-        bodyStart = chunk * BODY_MAX_LENGTH
-        bodyEnd = bodyStart + BODY_MAX_LENGTH
+        bodyStart = chunk * bodyMaxLength
+        bodyEnd = bodyStart + bodyMaxLength
       if bodyEnd > length:
         bodyEnd = length
 
@@ -215,22 +245,33 @@ proc getCredentials(connection: Connection, frame: Frame): string =
   result = 0.char & connection.parameters.username & 0.char & connection.parameters.password
 
 proc sendConnectionStartOk(connection: Connection, connectionStartFrame: Frame, response: string) =
-  var
-    connectionStartOkFrame = Frame(
+  connection.sendFrame(
+    Frame(
       kind: fkMethod,
-      rpcMethod: Method(
-        class: cConnection,
-        kind: mStartOk,
-        mStartOkParams: (
-          initTable[string, ValueNode](),   # Default client params is nothing
-          "PLAIN",
-          response,
-          connectionStartFrame.rpcMethod.mStartParams.locales
-        )
-      )
+      rpcMethod: initMethodStartOk(
+        initTable[string, ValueNode](),
+        "PLAIN",
+        response,
+        connectionStartFrame.rpcMethod.mStartParams.locales)
     )
+  )
 
-  connection.sendFrame(connectionStartOkFrame)
+proc sendConnectionTune(connection: Connection, channelMax: uint16, frameMax: uint32, heartbeat: uint16, ok = false) =
+  let f = if ok: initMethodTuneOk else: initMethodTune
+  connection.sendFrame(
+    Frame(
+      kind: fkMethod,
+      rpcMethod: f(channelMax, frameMax, heartbeat)
+    )
+  )
+
+proc sendConnectionOpen(connection: Connection, virtualHost, capabilities: string, insist: bool) =
+  connection.sendFrame(
+    Frame(
+      kind: fkMethod,
+      rpcMethod: initMethodOpen(virtualHost, capabilities, insist)
+    )
+  )
 
 proc sendConnectionClose(connection: Connection, params: ClosingParams) =
   var
@@ -249,18 +290,6 @@ proc sendConnectionClose(connection: Connection, params: ClosingParams) =
 
 # Callbacks
 
-proc onConnectionStart(connection: Connection, methodFrame: Frame) =
-  connection.state = csStart
-  connection.serverProperties = methodFrame.rpcMethod.mStartParams.serverProperties
-  # if self._is_protocol_header_frame(method_frame):
-  #     raise exceptions.UnexpectedFrameError
-  # self._check_for_protocol_mismatch(method_frame)
-  # self._set_server_information(method_frame)
-  # self._add_connection_tune_callback()
-
-  # TODO parametrize connection start response string?
-  connection.sendConnectionStartOk(methodFrame, connection.getCredentials(methodFrame))
-
 proc onConnected(connection: Connection) =
   connection.state = csProtocol
   connection.sendFrame(protocolHeader())
@@ -277,6 +306,47 @@ proc onDataAvailable*(connection: Connection, data: string) =
       connection.processFrame(frame.get())
     except IOError:
       return
+
+proc onConnectionStart(connection: Connection, methodFrame: Frame) =
+  connection.state = csStart
+  connection.serverProperties = methodFrame.rpcMethod.mStartParams.serverProperties
+  # if self._is_protocol_header_frame(method_frame):
+  #     raise exceptions.UnexpectedFrameError
+  # self._check_for_protocol_mismatch(method_frame)
+  # self._set_server_information(method_frame)
+
+  # TODO parametrize connection start response string?
+  connection.sendConnectionStartOk(methodFrame, connection.getCredentials(methodFrame))
+
+proc onConnectionTune(connection: Connection, methodFrame: Frame) =
+  let frameParams = methodFrame.rpcMethod.mTuneParams
+  connection.state = csTune
+  let
+    channelMax = negotiateIntegerValue(
+      connection.parameters.channelMax, frameParams.channelMax
+    )
+    frameMax = negotiateIntegerValue(
+      connection.parameters.frameMax, frameParams.frameMax
+    )
+    heartbeat = negotiateIntegerValue(
+      connection.parameters.heartbeat, frameParams.heartbeat
+    )
+  connection.parameters.channelMax = channelMax
+  connection.parameters.frameMax = frameMax
+  connection.parameters.heartbeat = heartbeat
+  # Calculate the maximum pieces for body frames
+  #self._body_max_length = self._get_body_frame_max_length()
+
+  # Create a new heartbeat checker if needed
+  #self.heartbeat = self._create_heartbeat_checker()
+
+  # Send the TuneOk response with what we've agreed upon
+  connection.sendConnectionTune(channelMax, frameMax, heartbeat, ok = true)
+
+  # Send the Connection.Open RPC call for the vhost
+  #self._send_connection_open()
+
+  quit()
 
 proc onCloseReady(connection: Connection) =
   if connection.state == csClosed:

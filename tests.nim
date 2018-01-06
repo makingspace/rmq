@@ -1,5 +1,5 @@
 import unittest, strutils, sequtils, tables, algorithm
-import rmqsrc/connections, rmqsrc/values, rmqsrc/spec, rmqsrc/methods, rmqsrc/frame, rmqsrc/encode
+import rmqsrc/connections, rmqsrc/values, rmqsrc/spec, rmqsrc/methods, rmqsrc/frame
 
 const
   handShakeStart = @[
@@ -52,7 +52,7 @@ suite "connection tests":
 
   setUp:
     let
-      params = (host: "", port: 0, username: "", password: "")
+      params = initConnectionParameters("", 0, username = "", password = "")
       c = newConnection(params)
 
   test "handle incomplete buffer":
@@ -82,17 +82,18 @@ suite "connection tests":
 suite "encoding test":
 
   test "marshall startok method frame":
-    var
-      m = Method(class: cConnection)
-      f = Frame()
+    let
+      serverProperties = initTable[string, ValueNode]()
+      mechanisms = "PLAIN"
+      response = "userpassword"
+      locales = "en_US"
+      m = initMethodStartOk(serverProperties, mechanisms, response, locales)
+      f = Frame(
+        channelNumber: 1.uint16,
+        kind: fkMethod,
+        rpcMethod: m
+      )
 
-    m.kind = mStartOk
-    m.mStartOkParams = (initTable[string, ValueNode](),"PLAIN", "userpassword", "en_US")
+    const expectedMarshaled = @['\x01', '\x00', '\x01', '\x00', '\x00', '\x00', '$', '\x00', '\x0A', '\x00', '\x0B', '\x00', '\x00', '\x00', '\x00', '\x05', 'P', 'L', 'A', 'I', 'N', '\x00', '\x00', '\x00', '\x0C', 'u', 's', 'e', 'r', 'p', 'a', 's', 's', 'w', 'o', 'r', 'd', '\x05', 'e', 'n', '_', 'U', 'S', '\xCE']
 
-    f.channelNumber = 1.uint16
-    f.kind = fkMethod
-    f.rpcMethod = m
-
-    const byteseq = @['\x01', '\x00', '\x01', '\x00', '\x00', '\x00', '$', '\x00', '\x0A', '\x00', '\x0B', '\x00', '\x00', '\x00', '\x00', '\x05', 'P', 'L', 'A', 'I', 'N', '\x00', '\x00', '\x00', '\x0C', 'u', 's', 'e', 'r', 'p', 'a', 's', 's', 'w', 'o', 'r', 'd', '\x05', 'e', 'n', '_', 'U', 'S', '\xCE']
-
-    check f.marshal() == byteseq.join()
+    check f.marshal() == expectedMarshaled.join()

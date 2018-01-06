@@ -1,6 +1,6 @@
-import tables
+import tables, times, sequtils, strutils
+import utils.encode
 
-import times
 type
   ValueType* = enum
     vtNull,
@@ -61,10 +61,10 @@ type
       keys*: seq[string]
       values*: seq[ValueNode]
 
-proc toNode(v: ValueNode): ValueNode =
-  return v
+proc `$`*(valueNode: ValueNode): string =
+  "Value Node " & $valueNode.valueType
 
-proc toNode(v: bool): ValueNode =
+converter toNode*(v: bool): ValueNode =
   return ValueNode(valueType: vtBool, boolValue: v)
 
 proc toNode*(v: string, vtype: ValueType): ValueNode =
@@ -77,7 +77,7 @@ proc toNode*(v: string, vtype: ValueType): ValueNode =
   else:
     raise newException(ValueError, "Cannot transform string to non-string ValueNode")
 
-proc toNode*(table: Table[string, ValueNode]): ValueNode =
+converter toNode*(table: Table[string, ValueNode]): ValueNode =
   # TODO add grammar checks
   # e.g. keys start with '$', '#', or letters. See 4.2.1 Formal Protocol Grammar for full spec
   result = ValueNode(valueType: vtTable, keys: @[], values: @[])
@@ -97,9 +97,45 @@ converter toNode*(v: uint16): ValueNode =
     shortUValue: v.int
   )
 
-proc `$`*(valueNode: ValueNode): string =
-  "Value Node " & $valueNode.valueType
+converter toNode*(v: uint32): ValueNode =
+  result = ValueNode(
+    valueType: vtLongU,
+    longUValue: v.int
+  )
 
+# Encode value nodes
+proc encode*(vnode: ValueNode): seq[char] =
+  result = newSeq[char]()
+  case vnode.valueType
+  of vtBool:
+    result &= encode(vnode.boolValue.uint8)
+  of vtShortStr:
+    result &= encode(vnode.shortStrValue.len.uint8)
+    result &= encode(vnode.shortStrValue)
+  of vtLongStr:
+    result &= encode(vnode.longStrValue.len.uint32)
+    result &= encode(vnode.longStrValue)
+  of vtTable:
+    var encodedTable = newSeq[char]()
+
+    for i in 0 .. vnode.keys.high:
+      encodedTable &= encode(vnode.keys[i].toNode(vtShortStr))
+      encodedTable &= encode(vnode.values[i])
+
+    result &= encode(encodedTable.len.uint32)
+    result &= encodedTable
+  of vtShort:
+    result &= encode(vnode.shortValue.int16)
+  of vtShortU:
+    result &= encode(vnode.shortUValue.uint16)
+  of vtLongU:
+    result &= encode(vnode.longUValue.uint32)
+  else:
+    # TODO add more cases
+    raise newException(ValueError, "Cannot encode $#" % [$vnode])
+
+proc encode*(params: varargs[ValueNode]): seq[char] =
+  return params.foldl(a & encode(b), newSeq[char]())
 # TODO make this a test suite later...
 when isMainModule:
   echo toNode({"a": ValueNode(valueType: vtShort, shortValue: 1)}.toTable)

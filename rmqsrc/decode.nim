@@ -198,6 +198,14 @@ proc decodeConnectionStart(data: Stream): Method =
     versionMajor, versionMinor, serverPropertiesTable, mechanisms, locales
   )
 
+proc decodeTune(data: Stream): Method =
+  let
+    channelMax = data.readBigEndianU16
+    frameMax = data.readBigEndianU32
+    heartbeat = data.readBigEndianU16
+
+  result = initMethodTune(channelMax, frameMax, heartbeat)
+
 proc decodeCloseOk(data: Stream): Method =
   result = initMethodCloseOk()
 
@@ -210,6 +218,7 @@ proc decodeMethod(data: Stream): Method =
 
   case methodId
   of mStart: data.decodeConnectionStart()
+  of mTune: data.decodeTune()
   of mCloseOk: data.decodeCloseOk()
   else: raise newException(ValueError, "Cannot decode Method ID: $#" % [$methodId])
 

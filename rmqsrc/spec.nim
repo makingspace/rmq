@@ -3,25 +3,25 @@ import tables, sequtils, strutils
 type
   ChannelNumber* = uint16
   Class* = enum
-    cNull,        # For discriminant
-    cConnection,  # work with socket connections
-    cChannel,     # work with channels
-    cExchange,    # work with exchanges
-    cQueue,       # work with exchanges
-    cBasic        # work with basic content
+    cNull                       # For discriminant
+    cConnection = "Connection"  # work with socket connections
+    cChannel = "Channel"        # work with channels
+    cExchange = "Exchange"      # work with exchanges
+    cQueue = "Queue"            # work with exchanges
+    cBasic = "Basic"            # work with basic content
 
   MethodId* = enum
-    mNull,        # For discriminant
-    mStart,       # start connection negotiation
-    mStartOk,     # select security mechanism and locale
-    mSecure,      # security mechanism challenge
-    mSecureOk,    # security mechanism response
-    mTune,        # propose connection tuning parameters
-    mTuneOk,      # negotiate connection tuning parameters
-    mOpen,        # open connection to virtual host
-    mOpenOk,      # signal that connection is ready
-    mClose,       # request a connection close
-    mCloseOk      # confirm a connection close
+    mNull                     # For discriminant
+    mStart = "Start"          # start connection negotiation
+    mStartOk = "StartOk"      # select security mechanism and locale
+    mSecure = "Secure"        # security mechanism challenge
+    mSecureOk = "SecureOk"    # security mechanism response
+    mTune = "Tune"            # propose connection tuning parameters
+    mTuneOk = "TuneOk"        # negotiate connection tuning parameters
+    mOpen = "Open"            # open connection to virtual host
+    mOpenOk = "OpenOk"        # signal that connection is ready
+    mClose = "Close"          # request a connection close
+    mCloseOk = "CloseOk"      # confirm a connection close
 
 # TODO add more methods
 
@@ -34,8 +34,11 @@ const
   FRAME_END_SIZE* = 1
   FRAME_END* = 206.uint8
 
-  FRAME_MAX_SIZE* = 131072
+  FRAME_MAX_SIZE* = 131072.uint32
   BODY_MAX_LENGTH* = FRAME_MAX_SIZE - FRAME_HEADER_SIZE - FRAME_END_SIZE
+
+  MAX_CHANNELS* = uint16.high
+  DEFAULT_HEARTBEAT_TIMEOUT* = uint16.low
 
 let
   METHODS = {
