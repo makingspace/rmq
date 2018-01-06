@@ -22,8 +22,8 @@ proc readBigEndian16(s: Stream): int16 =
   result = s.readInt16
   bigEndian16(addr result, addr result)
 
-proc readClassId(s: Stream): auto = readBigEndian16(s)
-proc readMethodId(s: Stream): auto = readBigEndian16(s)
+proc readClassId(s: Stream): auto = readBigEndianU16(s)
+proc readMethodId(s: Stream): auto = readBigEndianU16(s)
 
 proc readBigEndianU32(s: Stream): uint32 =
   result = s.readUInt32
@@ -200,11 +200,14 @@ proc decodeConnectionStart(data: Stream): Method =
 
 proc decodeMethod(data: Stream): Method =
   let
-    class = data.readClassId.Class
-    methodId = data.readMethodId.MethodId
+    classNum = data.readClassId
+    methodNum = data.readMethodId
+
+  let (_, methodId) = toMethod(classNum, methodNum)
+
   case methodId
   of mStart: data.decodeConnectionStart()
-  else: Method(class: class)
+  else: raise newException(ValueError, "Cannot decode Method ID: $#" % [$methodId])
 
 proc decode*(data: string): DecodedFrame =
   if data.startsWith("AMQP"):
