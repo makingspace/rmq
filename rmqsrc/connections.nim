@@ -260,7 +260,7 @@ proc sendConnectionStartOk(connection: Connection, connectionStartFrame: Frame, 
     )
   )
 
-proc sendConnectionTune(connection: Connection, channelMax: uint16, frameMax: uint32, heartbeat: uint16, ok = false) =
+proc sendConnectionTuneOk(connection: Connection, channelMax: uint16, frameMax: uint32, heartbeat: uint16, ok = false) =
   let f = if ok: initMethodTuneOk else: initMethodTune
   connection.sendMethod(
     f(channelMax, frameMax, heartbeat)
@@ -329,7 +329,7 @@ proc onConnectionTune(connection: Connection, methodFrame: Frame) =
   #self.heartbeat = self._create_heartbeat_checker()
 
   # Send the TuneOk response with what we've agreed upon
-  connection.sendConnectionTune(channelMax, frameMax, heartbeat, ok = true)
+  connection.sendConnectionTuneOk(channelMax, frameMax, heartbeat, ok = true)
   connection.sendConnectionOpen(connection.parameters.virtualHost, insist = true)
 
 proc onConnectionOpenOk(connection: Connection, methodFrame: Frame) =
