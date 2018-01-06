@@ -72,7 +72,7 @@ suite "connection tests":
     check(not c.bufferRemaining)
 
     let diagnostics = c.diagnostics
-    check (493, 1, 494, 1) == diagnostics
+    check (34, 1, 494, 1) == diagnostics
     check 7 == c.serverProperties.len
     check csStart == c.state
     check 9 == c.serverProperties["capabilities"].keys.len
@@ -87,13 +87,12 @@ suite "encoding test":
       f = Frame()
 
     m.kind = mStartOk
-    m.mStartOkParams = (initTable[string, ValueNode](),"PLAIN", "hi", "en_US")
+    m.mStartOkParams = (initTable[string, ValueNode](),"PLAIN", "userpassword", "en_US")
 
     f.channelNumber = 1.uint16
     f.kind = fkMethod
     f.rpcMethod = m
 
-    const byteseq = @['\x01', '\x00', '\x01', '\x00', '\x00', '\x00', '\x1A', '\x00', '\x0A', '\x00', '\x0B', '\x00', '\x00', '\x00', '\x00', '\x05', 'P', 'L', 'A', 'I', 'N', '\x00', '\x00', '\x00', '\x02', 'h', 'i', '\x05', 'e', 'n', '_', 'U', 'S', '\xCE']
+    const byteseq = @['\x01', '\x00', '\x01', '\x00', '\x00', '\x00', '$', '\x00', '\x0A', '\x00', '\x0B', '\x00', '\x00', '\x00', '\x00', '\x05', 'P', 'L', 'A', 'I', 'N', '\x00', '\x00', '\x00', '\x0C', 'u', 's', 'e', 'r', 'p', 'a', 's', 's', 'w', 'o', 'r', 'd', '\x05', 'e', 'n', '_', 'U', 'S', '\xCE']
 
     check f.marshal() == byteseq.join()
-
