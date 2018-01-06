@@ -206,6 +206,13 @@ proc decodeTune(data: Stream): Method =
 
   result = initMethodTune(channelMax, frameMax, heartbeat)
 
+proc decodeOpenOk(data: Stream): Method =
+  let
+    knownHostsLength = data.readUInt8
+    knownHosts = data.readStr(knownHostsLength.int)
+
+  result = initMethodOpenOk(knownHosts)
+
 proc decodeCloseOk(data: Stream): Method =
   result = initMethodCloseOk()
 
@@ -220,6 +227,7 @@ proc decodeMethod(data: Stream): Method =
   of mStart: data.decodeConnectionStart()
   of mTune: data.decodeTune()
   of mCloseOk: data.decodeCloseOk()
+  of mOpenOk: data.decodeOpenOk()
   else: raise newException(ValueError, "Cannot decode Method ID: $#" % [$methodId])
 
 proc decode*(data: string): DecodedFrame =

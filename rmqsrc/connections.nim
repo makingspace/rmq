@@ -13,6 +13,7 @@ type ConnectionParameters = object
   channelMax: uint16
   frameMax: uint32
   heartbeat: uint16
+  virtualHost: string
 
 proc initConnectionParameters*(
   host: string, port: int,
@@ -20,7 +21,8 @@ proc initConnectionParameters*(
   password = "user",
   channelMax = MAX_CHANNELS,
   frameMax = FRAME_MAX_SIZE,
-  heartbeat = DEFAULT_HEARTBEAT_TIMEOUT
+  heartbeat = DEFAULT_HEARTBEAT_TIMEOUT,
+  virtualHost = "/"
 ): ConnectionParameters =
   ConnectionParameters(
     host: host,
@@ -29,7 +31,8 @@ proc initConnectionParameters*(
     password: password,
     channelMax: channelMax,
     frameMax: frameMax,
-    heartbeat: heartbeat
+    heartbeat: heartbeat,
+    virtualHost: virtualHost
   )
 
 type ConnectionEvent* = enum
@@ -59,6 +62,7 @@ type
     socket: Option[AsyncSocket]
     bytesSent, framesSent, bytesReceived, framesReceived: int
     channels: ChannelTable
+    knownHosts: string
 
   ConnectionDiagnostics = tuple
     bytesSent, framesSent, bytesReceived, framesReceived: int
@@ -78,6 +82,7 @@ proc onDataAvailable*(connection: Connection, data: string)
 proc flushOutbound(connection: Connection)
 proc onConnectionStart(connection: Connection, methodFrame: Frame)
 proc onConnectionTune(connection: Connection, methodFrame: Frame)
+proc onConnectionOpenOk(connection: Connection, methodFrame: Frame)
 proc onCloseReady(connection: Connection)
 proc onConnectionCloseOk(connection: Connection, _: Frame)
 
@@ -129,8 +134,9 @@ proc methodNoOp(c: Connection, f: Frame) = discard
 proc getMethodCallback(cm: MethodId): FrameCallback =
   case cm
   of mStart: onConnectionStart
-  of mCloseOk: onConnectionCloseOk
   of mTune: onConnectionTune
+  of mOpenOk: onConnectionOpenOk
+  of mCloseOk: onConnectionCloseOk
   else: methodNoOp
 
 proc processCallbacks(connection: Connection, frame: Frame): bool =
@@ -222,7 +228,7 @@ proc sendFrame(connection: Connection, frame: Frame) =
 
   # TODO: Detect backpressure.
 
-proc sendMethod(connection: Connection, channelNumber: ChannelNumber, rpcMethod: Method, content = none MessageContent) =
+proc sendMethod(connection: Connection, rpcMethod: Method, channelNumber: ChannelNumber = 0, content = none MessageContent) =
   if content.isSome:
     connection.sendMessage(channelNumber, rpcMethod, content.get())
   else:
@@ -245,48 +251,30 @@ proc getCredentials(connection: Connection, frame: Frame): string =
   result = 0.char & connection.parameters.username & 0.char & connection.parameters.password
 
 proc sendConnectionStartOk(connection: Connection, connectionStartFrame: Frame, response: string) =
-  connection.sendFrame(
-    Frame(
-      kind: fkMethod,
-      rpcMethod: initMethodStartOk(
+  connection.sendMethod(
+    initMethodStartOk(
         initTable[string, ValueNode](),
         "PLAIN",
         response,
-        connectionStartFrame.rpcMethod.mStartParams.locales)
+        connectionStartFrame.rpcMethod.mStartParams.locales
     )
   )
 
 proc sendConnectionTune(connection: Connection, channelMax: uint16, frameMax: uint32, heartbeat: uint16, ok = false) =
   let f = if ok: initMethodTuneOk else: initMethodTune
-  connection.sendFrame(
-    Frame(
-      kind: fkMethod,
-      rpcMethod: f(channelMax, frameMax, heartbeat)
-    )
+  connection.sendMethod(
+    f(channelMax, frameMax, heartbeat)
   )
 
-proc sendConnectionOpen(connection: Connection, virtualHost, capabilities: string, insist: bool) =
-  connection.sendFrame(
-    Frame(
-      kind: fkMethod,
-      rpcMethod: initMethodOpen(virtualHost, capabilities, insist)
-    )
+proc sendConnectionOpen(connection: Connection, virtualHost: string, insist: bool) =
+  connection.sendMethod(
+    initMethodOpen(virtualHost, insist)
   )
 
 proc sendConnectionClose(connection: Connection, params: ClosingParams) =
-  var
-    connectionCloseFrame = Frame(
-      kind: fkMethod,
-      rpcMethod: Method(
-        class: cConnection,
-        kind: mClose,
-        mCloseParams: (
-          params.replyCode, params.reason
-        )
-      )
-    )
-
-  connection.sendFrame(connectionCloseFrame)
+  connection.sendMethod(
+    initMethodClose(params)
+  )
 
 # Callbacks
 
@@ -342,11 +330,12 @@ proc onConnectionTune(connection: Connection, methodFrame: Frame) =
 
   # Send the TuneOk response with what we've agreed upon
   connection.sendConnectionTune(channelMax, frameMax, heartbeat, ok = true)
+  connection.sendConnectionOpen(connection.parameters.virtualHost, insist = true)
 
-  # Send the Connection.Open RPC call for the vhost
-  #self._send_connection_open()
-
-  quit()
+proc onConnectionOpenOk(connection: Connection, methodFrame: Frame) =
+  let frameParams = methodFrame.rpcMethod.mOpenOkParams
+  connection.knownHosts = frameParams.knownHosts
+  connection.state = csOpen
 
 proc onCloseReady(connection: Connection) =
   if connection.state == csClosed:

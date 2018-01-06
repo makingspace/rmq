@@ -18,6 +18,8 @@ type
       mCloseParams*: ClosingParams
     of mOpen:
       mOpenParams*: tuple[virtualHost, capabilities: string, insist: bool]
+    of mOpenOk:
+      mOpenOkParams*: tuple[knownHosts: string]
     else:
       discard
 
@@ -49,17 +51,33 @@ proc initMethodTuneOk*(channelMax: uint16, frameMax: uint32, heartbeat: uint16):
     mTuneParams: (channelMax, frameMax, heartbeat)
   )
 
+proc initMethodClose*(params: ClosingParams): Method =
+  result = Method(
+    class: cConnection,
+    kind: mClose,
+    mCloseParams: (
+      params.replyCode, params.reason
+    )
+  )
+
 proc initMethodCloseOk*(): Method =
   result = Method(
     class: cConnection,
     kind: mCloseOk
   )
 
-proc initMethodOpen*(virtualHost, capabilities: string, insist: bool): Method =
+proc initMethodOpen*(virtualHost: string, insist: bool, capabilities = ""): Method =
   result = Method(
     class: cConnection,
     kind: mOpen,
     mOpenParams: (virtualHost, capabilities, insist)
+  )
+
+proc initMethodOpenOk*(knownHosts: string): Method =
+  result = Method(
+    class: cConnection,
+    kind: mOpenOk,
+    mOpenOkParams: (knownHosts: knownHosts)
   )
 
 # Encode frame components
@@ -93,6 +111,13 @@ proc encode*(m: Method): seq[char] =
       p.reason.toNode(vtShortStr),
       m.class.uint16,
       m.kind.uint16
+    )
+  of mOpen:
+    let p = m.mOpenParams
+    result &= encode(
+      p.virtualHost.toNode(vtShortStr),
+      p.capabilities.toNode(vtShortStr),
+      p.insist.toNode()
     )
   else:
     raise newException(ValueError, "Cannot encode: undefined method of '$#'" % [$m.kind])
