@@ -74,7 +74,7 @@ proc decodeValue*(data: Stream, typeChr: char = 0.chr): ValueNode =
     of vtLongU:
       result.longUValue = data.readBigEndianU32.int
     of vtLongLong:
-      result.longlongValue = data.readBigEndianU64.int
+      result.longlongValue = data.readBigEndian64.int
     of vtLongLongU:
       result.longLongUValue = data.readBigEndianU64.int
     of vtFloat:
