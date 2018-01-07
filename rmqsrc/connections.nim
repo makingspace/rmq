@@ -338,10 +338,14 @@ proc onConnectionOpenOk(connection: Connection, methodFrame: Frame) =
   connection.state = csOpen
 
 proc onCloseReady(connection: Connection) =
-  if connection.state == csClosed:
+  case connection.state
+  of csClosed:
     warn "$# Attempted to close closed connection." % $connection
-
-  connection.sendConnectionClose(connection.closingParams)
+  of csInit, csProtocol:
+    info "$# Not connected; Closing immediately."
+    connection.onConnectionCloseOk(Frame())
+  else:
+    connection.sendConnectionClose(connection.closingParams)
 
 proc onConnectionCloseOk(connection: Connection, _: Frame) =
   if connection.socket.isSome:

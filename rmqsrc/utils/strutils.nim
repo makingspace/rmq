@@ -1,3 +1,5 @@
+import streams
+
 proc parseEnumStyleSensitive*[T: enum](s: string): T =
   ## Parses an enum ``T``.
   ##
@@ -7,3 +9,9 @@ proc parseEnumStyleSensitive*[T: enum](s: string): T =
     if s == $e:
       return e
   raise newException(ValueError, "invalid enum value: " & s)
+
+proc newStringStream*(s: Stream, length: int): Stream =
+  ## Given a number of bytes, consume them from the stream and return a new
+  ## stream made from the resulting string.
+  let substring = s.readStr(length)
+  result = substring.newStringStream

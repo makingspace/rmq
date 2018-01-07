@@ -9,31 +9,6 @@ type
     frameSize: uint32
   DecodedFrame* = tuple[consumed: int, frame: Option[Frame]]
 
-proc readVersionNumber(s: Stream): auto = s.readUInt8
-
-proc readFrameKind(s: Stream): FrameKind =
-  result = s.readUInt8.FrameKind
-
-proc readBigEndianU16(s: Stream): uint16 =
-  result = s.readUInt16
-  bigEndian16(addr result, addr result)
-
-proc readChannelNumber(s: Stream): auto = s.readBigEndianU16
-
-proc readBigEndian16(s: Stream): int16 =
-  result = s.readInt16
-  bigEndian16(addr result, addr result)
-
-proc readClassId(s: Stream): auto = s.readBigEndianU16
-proc readMethodId(s: Stream): auto = s.readBigEndianU16
-proc readHeartbeat(s: Stream): auto = s.readBigEndianU16
-
-proc readBigEndianU32(s: Stream): uint32 =
-  result = s.readUInt32
-  bigEndian32(addr result, addr result)
-
-proc readFrameSize(s: Stream): auto = s.readBigEndianU32
-
 proc readBigEndian32(s: Stream): int32 =
   result = s.readInt32
   bigEndian32(addr result, addr result)
@@ -46,18 +21,32 @@ proc readBigEndian64(s: Stream): int64 =
   result = s.readInt64
   bigEndian64(addr result, addr result)
 
+proc readBigEndianU32(s: Stream): uint32 =
+  result = s.readUInt32
+  bigEndian32(addr result, addr result)
+
+proc readBigEndian16(s: Stream): int16 =
+  result = s.readInt16
+  bigEndian16(addr result, addr result)
+
+proc readBigEndianU16(s: Stream): uint16 =
+  result = s.readUInt16
+  bigEndian16(addr result, addr result)
+
+proc readVersionNumber(s: Stream): auto = s.readUInt8
+proc readFrameKind(s: Stream): FrameKind = s.readUInt8.FrameKind
+proc readChannelNumber(s: Stream): auto = s.readBigEndianU16
+proc readClassId(s: Stream): auto = s.readBigEndianU16
+proc readMethodId(s: Stream): auto = s.readBigEndianU16
+proc readHeartbeat(s: Stream): auto = s.readBigEndianU16
+proc readFrameSize(s: Stream): auto = s.readBigEndianU32
+
 proc readFrameParams(s: Stream): FrameParams =
   let
     frameKind = s.readFrameKind
     channelNumber = s.readChannelNumber
     frameSize = s.readFrameSize
   (frameKind, channelNumber, frameSize)
-
-proc initSubStream(s: Stream, length: int): Stream =
-  ## Given a number of bytes, consume them from the stream and return a new
-  ## stream made from the resulting string.
-  let substring = s.readStr(length)
-  result = substring.newStringStream
 
 proc decodeValue*(data: Stream, typeChr: char = 0.chr): ValueNode =
   var
@@ -106,7 +95,7 @@ proc decodeValue*(data: Stream, typeChr: char = 0.chr): ValueNode =
       let length = data.readBigEndianU32.int
 
       var
-        substream = data.initSubStream(length)
+        substream = data.newStringStream(length)
         arrayNodeValue = newSeq[ValueNode]()
 
       while not substream.atEnd:
@@ -120,7 +109,7 @@ proc decodeValue*(data: Stream, typeChr: char = 0.chr): ValueNode =
       let size = data.readBigEndianU32.int
 
       var
-        substream = data.initSubStream(size)
+        substream = data.newStringStream(size)
         keys = newSeq[string]()
         values = newSeq[ValueNode]()
 
@@ -134,7 +123,7 @@ proc decodeValue*(data: Stream, typeChr: char = 0.chr): ValueNode =
 
       result.keys = keys
       result.values = values
-    else:
+    of vtNull:
       discard
 
 proc decodeConnectionStart(data: Stream): Method =
