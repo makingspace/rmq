@@ -79,6 +79,18 @@ suite "connection tests":
     check expectedCapabilities == c.serverProperties["capabilities"].keys.sorted(system.cmp)
     check expectedCapabilitiesValuesTypes == c.serverProperties["capabilities"].values.mapIt(it.valueType)
 
+  test "handle Connection.OpenOk":
+    const response = @[
+      0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x0a, 0x00, 0x29, 0x00, 0xce
+    ].mapIt(it.char).join
+
+    let (consumed, responseFrame) = response.decode()
+    check responseFrame.isSome
+
+    check:
+      13 == consumed.int
+      "" == responseFrame.get.rpcMethod.mOpenOkParams.knownHosts
+
 suite "encoding":
 
   test "marshall startok method frame":
