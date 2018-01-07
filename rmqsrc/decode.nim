@@ -5,9 +5,9 @@ import frame, spec, methods, values, utils/strutils as rmqStrUtils
 type
   FrameParams = tuple
     frameKind: FrameKind
-    frameChannel: uint16
-    frameSize: uint32
-  DecodedFrame* = tuple[consumed: int, frame: Option[Frame]]
+    frameChannel: ChannelNumber
+    frameSize: FrameSize
+  DecodedFrame* = tuple[consumed: FrameSize, frame: Option[Frame]]
 
 proc readBigEndian32(s: Stream): int32 =
   result = s.readInt32
@@ -35,11 +35,11 @@ proc readBigEndianU16(s: Stream): uint16 =
 
 proc readVersionNumber(s: Stream): auto = s.readUInt8
 proc readFrameKind(s: Stream): FrameKind = s.readUInt8.FrameKind
-proc readChannelNumber(s: Stream): auto = s.readBigEndianU16
+proc readChannelNumber(s: Stream): ChannelNumber = s.readBigEndianU16
 proc readClassId(s: Stream): auto = s.readBigEndianU16
 proc readMethodId(s: Stream): auto = s.readBigEndianU16
-proc readHeartbeat(s: Stream): auto = s.readBigEndianU16
-proc readFrameSize(s: Stream): auto = s.readBigEndianU32
+proc readHeartbeat(s: Stream): HeartbeatInterval = s.readBigEndianU16
+proc readFrameSize(s: Stream): FrameSize = s.readBigEndianU32
 
 proc readFrameParams(s: Stream): FrameParams =
   let
@@ -177,22 +177,22 @@ proc decode*(data: string): DecodedFrame =
         minor = data[6]
         revision = data[7]
 
-      return (8, some initProtocolHeader(major, minor, revision))
+      return (8.FrameSize, some initProtocolHeader(major, minor, revision))
     except IndexError:
-      return (0, none Frame)
+      return (0.FrameSize, none Frame)
   else:
     var stream = newStringStream(data)
     let
       (frameKind, frameChannel, frameSize) = readFrameParams(stream)
-      frameEnd = FRAME_HEADER_SIZE + frameSize.int + FRAME_END_SIZE
+      frameEnd = FRAME_HEADER_SIZE + frameSize.FrameSize + FRAME_END_SIZE
 
-    if frameEnd > data.len:
+    if frameEnd > data.len.FrameSize:
       # We don't have all the data yet.
-      return (0, none Frame)
+      return (0.FrameSize, none Frame)
 
     case frameKind
     of fkMethod:
       let decodedMethod = decodeMethod(stream)
       return (frameEnd, some initMethod(frameChannel, decodedMethod))
     else:
-      return (0, none Frame)
+      return (0.FrameSize, none Frame)

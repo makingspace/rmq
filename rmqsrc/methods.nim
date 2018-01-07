@@ -9,11 +9,17 @@ type
     class*: Class
     case kind*: MethodId
     of mStart:
-      mStartParams*: tuple[versionMajor, versionMinor: uint8, serverProperties: Table[string, ValueNode], mechanisms, locales: string]
+      mStartParams*: tuple[
+        versionMajor, versionMinor: VersionNumber,
+        serverProperties: Table[string, ValueNode],
+        mechanisms, locales: string
+      ]
     of mStartOk:
       mStartOkParams: tuple[serverProperties: Table[string, ValueNode], mechanisms, response, locales: string]
     of mTune, mTuneOk:
-      mTuneParams*: tuple[channelMax: uint16, frameMax: uint32, heartbeat: uint16]
+      mTuneParams*: tuple[
+        channelMax: ChannelNumber, frameMax: FrameSize, heartbeat: HeartbeatInterval
+      ]
     of mClose:
       mCloseParams*: ClosingParams
     of mOpen:
@@ -23,28 +29,42 @@ type
     else:
       discard
 
-proc initMethodStart*(versionMajor, versionMinor: uint8, serverProperties: Table[string, ValueNode], mechanisms, locales: string): Method =
+proc initMethodStart*(
+  versionMajor, versionMinor: VersionNumber,
+  serverProperties: Table[string, ValueNode], mechanisms, locales: string
+): Method =
   result = Method(
     class: cConnection,
     kind: mStart,
     mStartParams: (versionMajor, versionMinor, serverProperties, mechanisms, locales)
   )
 
-proc initMethodStartOk*(serverProperties: Table[string, ValueNode], mechanisms, response, locales: string): Method =
+proc initMethodStartOk*(
+  serverProperties: Table[string, ValueNode],
+  mechanisms, response, locales: string
+): Method =
   result = Method(
     class: cConnection,
     kind: mStartOk,
     mStartOkParams: (serverProperties, mechanisms, response, locales)
   )
 
-proc initMethodTune*(channelMax: uint16, frameMax: uint32, heartbeat: uint16): Method =
+proc initMethodTune*(
+  channelMax: ChannelNumber,
+  frameMax: FrameSize,
+  heartbeat: HeartbeatInterval
+): Method =
   result = Method(
     class: cConnection,
     kind: mTune,
     mTuneParams: (channelMax, frameMax, heartbeat)
   )
 
-proc initMethodTuneOk*(channelMax: uint16, frameMax: uint32, heartbeat: uint16): Method =
+proc initMethodTuneOk*(
+  channelMax: ChannelNumber,
+  frameMax: FrameSize,
+  heartbeat: HeartbeatInterval
+): Method =
   result = Method(
     class: cConnection,
     kind: mTuneOk,

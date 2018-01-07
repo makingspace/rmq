@@ -10,9 +10,9 @@ type ConnectionParameters = object
   port: int
   username: string
   password: string
-  channelMax: uint16
-  frameMax: uint32
-  heartbeat: uint16
+  channelMax: ChannelNumber
+  frameMax: FrameSize
+  heartbeat: HeartbeatInterval
   virtualHost: string
 
 proc initConnectionParameters*(
@@ -41,7 +41,7 @@ const baseEvents = {ceRead, ceError}
 
 type
   Channel = object
-  ChannelTable = TableRef[int, Channel]
+  ChannelTable = TableRef[ChannelNumber, Channel]
   ConnectionState* = enum
     csClosed = "Closed"
     csInit = "Init"
@@ -92,7 +92,7 @@ proc initConnection(connection: Connection, parameters: ConnectionParameters) =
   connection.parameters = parameters
   connection.outboundBuffer = initDeque[string]()
   connection.frameBuffer = ""
-  connection.channels = newTable[int, Channel]()
+  connection.channels = newTable[ChannelNumber, Channel]()
 
 proc newConnection*(parameters: ConnectionParameters): Connection =
   result = Connection()
@@ -152,20 +152,21 @@ proc send*(connection: Connection, msg: string) {.async.} =
   let socket = connection.socket.get()
   asyncCheck socket.send(msg)
 
-proc recv*(connection: Connection): Future[int] {.async.} =
+proc recv*(connection: Connection): Future[FrameSize] {.async.} =
   var
     socket = connection.socket.get()
     data = newString(FRAME_MAX_SIZE)
 
   try:
-    result = await socket.recvInto(addr data[0], FRAME_MAX_SIZE.int)
-    data.setLen(result)
+    let bytesReceived = await socket.recvInto(addr data[0], FRAME_MAX_SIZE.int)
+    data.setLen(bytesReceived)
   except TimeoutError:
     discard
 
   if data.len > 0:
     connection.onDataAvailable(data)
-  result = data.len
+
+  result = data.len.FrameSize
 
 # Frame handling
 
@@ -175,9 +176,9 @@ proc readFrame(connection: Connection): DecodedFrame =
   ]
   result = connection.frameBuffer.decode()
 
-proc trimFrameBuffer(connection: Connection, length: int) =
-  connection.frameBuffer.delete(0, length - 1)
-  connection.bytesReceived += length
+proc trimFrameBuffer(connection: Connection, length: FrameSize) =
+  connection.frameBuffer.delete(0, length.int - 1)
+  connection.bytesReceived += length.int
 
 proc processFrame(connection: Connection, frame: Frame) =
   info "$# Processing frame: $#" % [$connection, $frame]
@@ -260,7 +261,13 @@ proc sendConnectionStartOk(connection: Connection, connectionStartFrame: Frame, 
     )
   )
 
-proc sendConnectionTuneOk(connection: Connection, channelMax: uint16, frameMax: uint32, heartbeat: uint16, ok = false) =
+proc sendConnectionTune(
+  connection: Connection,
+  channelMax: ChannelNumber,
+  frameMax: FrameSize,
+  heartbeat: HeartbeatInterval,
+  ok = false
+) =
   let f = if ok: initMethodTuneOk else: initMethodTune
   connection.sendMethod(
     f(channelMax, frameMax, heartbeat)
@@ -329,7 +336,7 @@ proc onConnectionTune(connection: Connection, methodFrame: Frame) =
   #self.heartbeat = self._create_heartbeat_checker()
 
   # Send the TuneOk response with what we've agreed upon
-  connection.sendConnectionTuneOk(channelMax, frameMax, heartbeat, ok = true)
+  connection.sendConnectionTune(channelMax, frameMax, heartbeat, ok = true)
   connection.sendConnectionOpen(connection.parameters.virtualHost, insist = true)
 
 proc onConnectionOpenOk(connection: Connection, methodFrame: Frame) =

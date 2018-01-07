@@ -1,7 +1,11 @@
 import tables, sequtils, strutils
 
 type
+  VersionNumber* = uint8
   ChannelNumber* = uint16
+  FrameSize* = uint32
+  HeartbeatInterval* = uint16
+
   Class* = enum
     cNull                       # For discriminant
     cConnection = "Connection"  # work with socket connections
@@ -23,6 +27,7 @@ type
     mClose = "Close"          # request a connection close
     mCloseOk = "CloseOk"      # confirm a connection close
 
+
 # TODO add more methods
 
 const
@@ -30,15 +35,15 @@ const
   VERSION_MINOR* = 9.char
   VERSION_REVISION* = 1.char
 
-  FRAME_HEADER_SIZE* = 7
-  FRAME_END_SIZE* = 1
-  FRAME_END* = 206.uint8
+  FRAME_HEADER_SIZE* = 7.FrameSize
+  FRAME_END_SIZE* = 1.FrameSize
+  FRAME_END* = 206.byte
 
-  FRAME_MAX_SIZE* = 131072.uint32
+  FRAME_MAX_SIZE* = 131072.FrameSize
   BODY_MAX_LENGTH* = FRAME_MAX_SIZE - FRAME_HEADER_SIZE - FRAME_END_SIZE
 
-  MAX_CHANNELS* = uint16.high
-  DEFAULT_HEARTBEAT_TIMEOUT* = uint16.low
+  MAX_CHANNELS* = ChannelNumber.low
+  DEFAULT_HEARTBEAT_TIMEOUT* = HeartbeatInterval.low
 
 let
   METHODS = {
