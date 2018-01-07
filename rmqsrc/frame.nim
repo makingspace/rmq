@@ -5,10 +5,10 @@ import utils.encode
 
 type
   FrameKind* = enum
-    fkProtocol = 0,
-    fkMethod = 1,
-    fkHeader = 2,
-    fkBody = 3,
+    fkProtocol = 0
+    fkMethod = 1
+    fkHeader = 2
+    fkBody = 3
     fkHeartbeat = 4
 
   Frame* = object of RootObj
@@ -33,7 +33,6 @@ proc `$`*(frame: Frame): string =
     $frame.kind, $frame.rpcMethod.class, $frame.rpcMethod.kind
   ]
   else: "Frame: $#" % $frame.kind
-
 
 proc initProtocolHeader*(major, minor, revision: char): Frame = Frame(
   kind: fkProtocol,

@@ -89,6 +89,15 @@ proc encode*(m: Method): seq[char] =
   result &= methodId.encode()
 
   case m.kind
+  of mStart:
+    let p = m.mStartParams
+    result &= encode(
+      p.versionMajor.toNode,
+      p.versionMinor.toNode,
+      p.serverProperties.toNode,
+      p.mechanisms.toNode(vtLongStr),
+      p.locales.toNode(vtLongStr)
+    )
   of mStartOk:
     let p = m.mStartOkParams
     result &= encode(

@@ -1,5 +1,5 @@
-import unittest, strutils, sequtils, tables, algorithm
-import rmqsrc/connections, rmqsrc/values, rmqsrc/spec, rmqsrc/methods, rmqsrc/frame
+import unittest, strutils, sequtils, tables, algorithm, options, streams
+import rmqsrc/connections, rmqsrc/values, rmqsrc/spec, rmqsrc/methods, rmqsrc/frame, rmqsrc/decode
 
 const
   handShakeStart = @[
@@ -79,7 +79,7 @@ suite "connection tests":
     check expectedCapabilities == c.serverProperties["capabilities"].keys.sorted(system.cmp)
     check expectedCapabilitiesValuesTypes == c.serverProperties["capabilities"].values.mapIt(it.valueType)
 
-suite "encoding test":
+suite "encoding":
 
   test "marshall startok method frame":
     let
@@ -97,3 +97,62 @@ suite "encoding test":
     const expectedMarshaled = @['\x01', '\x00', '\x01', '\x00', '\x00', '\x00', '$', '\x00', '\x0A', '\x00', '\x0B', '\x00', '\x00', '\x00', '\x00', '\x05', 'P', 'L', 'A', 'I', 'N', '\x00', '\x00', '\x00', '\x0C', 'u', 's', 'e', 'r', 'p', 'a', 's', 's', 'w', 'o', 'r', 'd', '\x05', 'e', 'n', '_', 'U', 'S', '\xCE']
 
     check f.marshal() == expectedMarshaled.join()
+
+  test "table encoding":
+    let
+      t = {"canFoo": true.toNode}.toTable
+      node = t.toNode
+
+    check:
+      @["canFoo"] == node.keys
+      1 == node.values.len
+      true == node.values[0].boolValue
+
+    const expectedBytes = @[
+      0.chr, 0.chr, 0.chr, 9.chr, 6.chr, 99.chr, 97.chr, 110.chr, 70.chr, 111.chr, 111.chr, 116.chr, 1.chr
+    ]
+    let
+      simpleTable = {"canFoo": true.toNode}.toTable.toNode
+      simpleEncoded = simpleTable.encode()
+    check simpleEncoded == expectedBytes
+
+
+    let
+      encoded = node.encode().join().newStringStream
+      decoded = encoded.decodeValue(typeChr = 'F')
+
+    check:
+      @["canFoo"] == decoded.keys
+      1 == decoded.values.len
+      true == decoded.values[0].boolValue
+
+
+suite "codec":
+
+  test "Protocol":
+    let
+      f = initProtocolHeader(0.char, 9.char, 1.char)
+      decoded = f.marshal().decode()[1].get()
+
+    check:
+      f.major == decoded.major
+      f.minor == decoded.minor
+      f.revision == decoded.revision
+
+  test "Connection.Start":
+    let
+      properties = {"capabilities": {"canFoo": true.toNode}.toTable.toNode}.toTable
+      f = initMethod(0, initMethodStart(0, 9, properties, "PLAIN", "en_US"))
+      decoded = f.marshal().decode()[1].get()
+      fParams = f.rpcMethod.mStartParams
+      decodedParams = decoded.rpcMethod.mStartParams
+
+    check:
+      fParams.versionMajor == decodedParams.versionMajor
+      fParams.versionMinor == decodedParams.versionMinor
+      @["canFoo"] == fParams.serverProperties["capabilities"].keys
+      @["canFoo"] == decodedParams.serverProperties["capabilities"].keys
+      true == fParams.serverProperties["capabilities"].values[0].boolValue
+      true == decodedParams.serverProperties["capabilities"].values[0].boolValue
+      fParams.mechanisms == decodedParams.mechanisms
+      fParams.locales == decodedParams.locales

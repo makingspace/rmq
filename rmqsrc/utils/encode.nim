@@ -4,18 +4,14 @@ import endians, tables, strutils, sequtils
 proc encode*(v: seq[char]): seq[char] =
   return v
 
-proc encode*(v: uint8): array[0..0, char] =
+proc encode*(v: int8 | uint8): array[0..0, char] =
   return [v.char]
 
-proc encode*(v: int16): array[0..1, char] =
+proc encode*(v: int16 | uint16): array[0..1, char] =
   var v = v
   bigEndian16(addr result, addr v)
 
-proc encode*(v: uint16): array[0..1, char] =
-  var v = v
-  bigEndian16(addr result, addr v)
-
-proc encode*(v: uint32): array[0..3, char] =
+proc encode*(v: int32 | uint32): array[0..3, char] =
   var v = v
   bigEndian32(addr result, addr v)
 

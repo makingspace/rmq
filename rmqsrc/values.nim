@@ -3,24 +3,24 @@ import utils.encode
 
 type
   ValueType* = enum
-    vtNull,
-    vtBool,
-    vtShortShort,
-    vtShortShortU,
-    vtShort,
-    vtShortU,
-    vtLong,
-    vtLongU,
-    vtLongLong,
-    vtLongLongU,
-    vtFloat,
-    vtDouble,
-    vtDecimal,
-    vtShortStr,
-    vtLongStr,
-    vtArray,
-    vtTimeStamp,
-    vtTable
+    vtNull
+    vtBool = "t"
+    vtShortShort = "b"
+    vtShortShortU = "B"
+    vtShort = "U"
+    vtShortU = "u"
+    vtLong = "I"
+    vtLongU = "i"
+    vtLongLong = "L"
+    vtLongLongU = "l"
+    vtFloat = "f"
+    vtDouble = "d"
+    vtDecimal = "D"
+    vtShortStr = "s"
+    vtLongStr = "S"
+    vtArray = "A"
+    vtTimeStamp = "T"
+    vtTable = "F"
 
   ValueNode* = object
     case valueType*: ValueType
@@ -85,6 +85,12 @@ converter toNode*(table: Table[string, ValueNode]): ValueNode =
     result.keys.add(k)
     result.values.add(v)
 
+converter toNode*(v: int8 | uint8): ValueNode =
+  result = ValueNode(
+    valueType: vtShortShort,
+    shortShortValue: v.int
+  )
+
 converter toNode*(v: int16): ValueNode =
   result = ValueNode(
     valueType: vtShort,
@@ -119,11 +125,21 @@ proc encode*(vnode: ValueNode): seq[char] =
     var encodedTable = newSeq[char]()
 
     for i in 0 .. vnode.keys.high:
+      # Encode key
       encodedTable &= encode(vnode.keys[i].toNode(vtShortStr))
-      encodedTable &= encode(vnode.values[i])
+      let valueValue = vnode.values[i]
+      assert 1 == ($valueValue.valueType).len
+      # Encode value type
+      encodedTable &= ($valueValue.valueType)[0]
+      # Encode value
+      encodedTable &= encode(valueValue)
 
     result &= encode(encodedTable.len.uint32)
     result &= encodedTable
+  of vtShortShort:
+    result &= encode(vnode.shortShortValue.int8)
+  of vtShortShortU:
+    result &= encode(vnode.shortShortUValue.uint8)
   of vtShort:
     result &= encode(vnode.shortValue.int16)
   of vtShortU:
