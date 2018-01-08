@@ -5,11 +5,11 @@ import utils.encode
 
 type
   FrameKind* = enum
-    fkProtocol = 0
-    fkMethod = 1
-    fkHeader = 2
-    fkBody = 3
-    fkHeartbeat = 4
+    fkProtocol = (0, "Protocol")
+    fkMethod = (1, "Method")
+    fkHeader = (2, "Header")
+    fkBody = (3, "Body")
+    fkHeartbeat = (4, "Heartbeat")
 
   Frame* = object of RootObj
     channelNumber*: ChannelNumber
@@ -29,10 +29,10 @@ type
 
 proc `$`*(frame: Frame): string =
   case frame.kind
-  of fkMethod: "Frame $#: $#.$#" % [
+  of fkMethod: "$#: $#.$#" % [
     $frame.kind, $frame.rpcMethod.class, $frame.rpcMethod.kind
   ]
-  else: "Frame: $#" % $frame.kind
+  else: $frame.kind
 
 proc initProtocolHeader*(major, minor, revision: char): Frame = Frame(
   kind: fkProtocol,
