@@ -150,7 +150,7 @@ suite "encoding":
 suite "codec":
 
   setUp:
-    let
+    const
       sampleProperties = {"capabilities": {"canFoo": true.toNode}.toTable.toNode}.toTable
       mechanisms = "PLAIN"
       response = "userpassword"

@@ -103,15 +103,16 @@ proc connect*(connection: Connection) =
   var socket = newAsyncSocket(buffered = false)
   try:
     info "Connecting to $# on $#" % [connection.parameters.host, $connection.parameters.port]
-    asyncCheck socket.connect(connection.parameters.host, Port(connection.parameters.port))
+    waitFor socket.connect(connection.parameters.host, Port(connection.parameters.port))
 
     info "Connected."
     connection.socket = some(socket)
     connection.onConnected()
-
-  except OSError:
-    info "Connection to $# failed." % connection.parameters.host
+  except OSError as e:
+    let eMsg = e.msg.splitLines()[0]
+    error "Connection to $# failed: $#" % [connection.parameters.host, eMsg]
     connection.state = csClosed
+    quit()
 
 proc close*(connection: Connection, replyCode = 200, reply_text = "Normal shutdown") =
   info "$# Closing." % $connection
