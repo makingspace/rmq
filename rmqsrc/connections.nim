@@ -98,14 +98,19 @@ proc newConnection*(parameters: ConnectionParameters): Connection =
   result = Connection()
   initConnection(result, parameters)
 
+proc log(connection: Connection, msg: string) =
+    info $connection & " " & msg
+
 proc connect*(connection: Connection) =
+  connection.log "Connecting to $# on $#" % [
+    connection.parameters.host, $connection.parameters.port
+  ]
   connection.state = csInit
   var socket = newAsyncSocket(buffered = false)
   try:
-    info "Connecting to $# on $#" % [connection.parameters.host, $connection.parameters.port]
     waitFor socket.connect(connection.parameters.host, Port(connection.parameters.port))
 
-    info "Connected."
+    connection.log "Connected."
     connection.socket = some(socket)
     connection.onConnected()
   except OSError as e:
@@ -115,7 +120,7 @@ proc connect*(connection: Connection) =
     quit()
 
 proc close*(connection: Connection, replyCode = 200, reply_text = "Normal shutdown") =
-  info "$# Closing." % $connection
+  connection.log "Closing."
 
   # TODO: Close channels
 
@@ -126,9 +131,7 @@ proc close*(connection: Connection, replyCode = 200, reply_text = "Normal shutdo
   if connection.channels.len == 0:
     connection.onCloseReady()
   else:
-    info "$# Waiting for $# channels to close." % [
-      $connection, $connection.channels.len
-    ]
+    connection.log "Waiting for $# channels to close." % $connection.channels.len
 
 type FrameCallback = proc(c: Connection, f: Frame)
 proc methodNoOp(c: Connection, f: Frame) = discard
@@ -171,18 +174,14 @@ proc recv*(connection: Connection): Future[FrameSize] {.async.} =
 
 # Frame handling
 
-proc readFrame(connection: Connection): DecodedFrame =
-  info "$# Reading frame (buffer length: $#)" % [
-    $connection, $connection.frameBuffer.len
-  ]
-  result = connection.frameBuffer.decode()
+proc readFrame(connection: Connection): DecodedFrame = connection.frameBuffer.decode()
 
 proc trimFrameBuffer(connection: Connection, length: FrameSize) =
   connection.frameBuffer.delete(0, length.int - 1)
   connection.bytesReceived += length.int
 
 proc processFrame(connection: Connection, frame: Frame) =
-  info "$# Processing frame: $#" % [$connection, $frame]
+  connection.log "Processing frame: $#" % $frame
   connection.framesReceived += 1
   if connection.processCallbacks(frame):
     return
@@ -214,7 +213,7 @@ proc sendMessage(connection: Connection, channelNumber: ChannelNumber, rpcMethod
     connection.flushOutbound()
 
 proc sendFrame(connection: Connection, frame: Frame) =
-  info "$# Sending $#" % [$connection, $frame]
+  connection.log "Sending $#" % $frame
 
   if connection.state == csClosed:
     raise newException(ValueError, "Attempted to send frame while closed.")
@@ -237,10 +236,6 @@ proc sendMethod(connection: Connection, rpcMethod: Method, channelNumber: Channe
     connection.sendFrame(initMethod(channelNumber, rpcMethod))
 
 proc flushOutbound(connection: Connection) =
-  info "$# Flushing outbound buffer ($# items)" % [
-    $connection, $connection.outboundBuffer.len
-  ]
-
   if connection.outboundBuffer.len > 0:
     if ceWrite notin connection.eventState:
       connection.eventState.incl(ceWrite)
@@ -287,6 +282,7 @@ proc sendConnectionClose(connection: Connection, params: ClosingParams) =
 # Callbacks
 
 proc onConnected(connection: Connection) =
+  connection.log "Starting protocol handshake."
   connection.state = csProtocol
   connection.sendFrame(protocolHeader())
 
@@ -304,6 +300,7 @@ proc onDataAvailable*(connection: Connection, data: string) =
       return
 
 proc onConnectionStart(connection: Connection, methodFrame: Frame) =
+  connection.log "Starting AMQP connection."
   connection.state = csStart
   connection.serverProperties = methodFrame.rpcMethod.mStartParams.serverProperties
   # if self._is_protocol_header_frame(method_frame):
@@ -316,6 +313,7 @@ proc onConnectionStart(connection: Connection, methodFrame: Frame) =
 
 proc onConnectionTune(connection: Connection, methodFrame: Frame) =
   let frameParams = methodFrame.rpcMethod.mTuneParams
+  connection.log "Starting AMQP tuning."
   connection.state = csTune
   let
     channelMax = negotiateIntegerValue(
@@ -342,15 +340,16 @@ proc onConnectionTune(connection: Connection, methodFrame: Frame) =
 
 proc onConnectionOpenOk(connection: Connection, methodFrame: Frame) =
   let frameParams = methodFrame.rpcMethod.mOpenOkParams
-  connection.knownHosts = frameParams.knownHosts
   connection.state = csOpen
+  connection.log "AMQP connection open."
+  connection.knownHosts = frameParams.knownHosts
 
 proc onCloseReady(connection: Connection) =
   case connection.state
   of csClosed:
     warn "$# Attempted to close closed connection." % $connection
   of csInit, csProtocol:
-    info "$# Not connected; Closing immediately."
+    connection.log "Not connected; Closing immediately."
     connection.onConnectionCloseOk(Frame())
   else:
     connection.sendConnectionClose(connection.closingParams)
@@ -359,8 +358,8 @@ proc onConnectionCloseOk(connection: Connection, _: Frame) =
   if connection.socket.isSome:
     connection.socket.get().close()
 
+  connection.log "Closing AMQP Connection."
   connection.state = csClosed
-  info "$# Closed." % $connection
 
 
 # Public methods
@@ -371,23 +370,23 @@ proc scheduleWrite*(connection: Connection) =
 proc clearWrite*(connection: Connection) =
   connection.eventState.excl(ceWrite)
 
-proc bufferRemaining*(connection: Connection): bool =
+proc bufferRemaining*(connection: Connection): bool {.noSideEffect.} =
   connection.frameBuffer.len > 0
 
-proc framesWaiting*(connection: Connection): bool =
+proc framesWaiting*(connection: Connection): bool {.noSideEffect.} =
   connection.outboundBuffer.len > 0
 
 proc nextFrame*(connection: Connection): string =
   connection.outboundBuffer.popFirst()
 
-proc connected*(connection: Connection): bool =
+proc connected*(connection: Connection): bool {.noSideEffect.} =
   connection.socket.isSome
 
 proc events*(connection: Connection): set[ConnectionEvent] =
   connection.eventState
 
-proc closed*(connection: Connection): bool =
-  connection.state = csClosed
+proc closed*(connection: Connection): bool {.noSideEffect.} =
+  connection.state == csClosed
 
 proc diagnostics*(connection: Connection): ConnectionDiagnostics =
   (connection.bytesSent,
