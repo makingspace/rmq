@@ -203,3 +203,28 @@ suite "codec":
     check fParams.response == response
     check decodedParams.response == response
     checkSharedStartParams()
+
+  template checkTuneParams() =
+
+    check:
+      fParams.channelMax == decodedParams.channelMax
+      fParams.frameMax == decodedParams.frameMax
+      fParams.heartbeat == decodedParams.heartbeat
+
+  test "Connection.Tune":
+    let
+      f = initMethod(0, initMethodTune(0.ChannelNumber, FRAME_MAX_SIZE, DEFAULT_HEARTBEAT_TIMEOUT))
+      decoded = f.reDecode
+      fParams = f.rpcMethod.mTuneParams
+      decodedParams = decoded.rpcMethod.mTuneParams
+
+    checkTuneParams()
+
+  test "Connection.TuneOk":
+    let
+      f = initMethod(0, initMethodTuneOk(0.ChannelNumber, FRAME_MAX_SIZE, DEFAULT_HEARTBEAT_TIMEOUT))
+      decoded = f.reDecode
+      fParams = f.rpcMethod.mTuneParams
+      decodedParams = decoded.rpcMethod.mTuneParams
+
+    checkTuneParams()

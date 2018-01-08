@@ -129,7 +129,7 @@ proc encode*(m: Method): seq[char] =
       p.response.toNode(vtLongStr),
       p.locales.toNode(vtShortStr)
     )
-  of mTuneOk:
+  of mTune, mTuneOk:
     let p = m.mTuneParams
     result &= encode(
       p.channelMax,

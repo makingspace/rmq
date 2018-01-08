@@ -151,13 +151,16 @@ proc decodeConnectionStartOk(data: Stream): Method =
     serverPropertiesTable, mechanisms, response, locales
   )
 
-proc decodeTune(data: Stream): Method =
+proc decodeTune(data: Stream, ok = false): Method =
   let
     channelMax = data.readChannelNumber
     frameMax = data.readFrameSize
     heartbeat = data.readHeartbeat
 
-  result = initMethodTune(channelMax, frameMax, heartbeat)
+  if ok:
+    result = initMethodTuneOk(channelMax, frameMax, heartbeat)
+  else:
+    result = initMethodTune(channelMax, frameMax, heartbeat)
 
 proc decodeOpenOk(data: Stream): Method =
   let knownHosts = data.decodeValue(typeChr = 's').shortStrValue
@@ -178,6 +181,7 @@ proc decodeMethod(data: Stream): Method =
   of mStart: data.decodeConnectionStart()
   of mStartOk: data.decodeConnectionStartOk()
   of mTune: data.decodeTune()
+  of mTuneOk: data.decodeTune(ok = true)
   of mCloseOk: data.decodeCloseOk()
   of mOpenOk: data.decodeOpenOk()
   else: raise newException(ValueError, "Cannot decode Method ID: $#" % [$methodId])
