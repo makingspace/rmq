@@ -15,7 +15,10 @@ type
         mechanisms, locales: string
       ]
     of mStartOk:
-      mStartOkParams: tuple[serverProperties: Table[string, ValueNode], mechanisms, response, locales: string]
+      mStartOkParams*: tuple[
+        serverProperties: Table[string, ValueNode],
+        mechanisms, response, locales: string
+      ]
     of mTune, mTuneOk:
       mTuneParams*: tuple[
         channelMax: ChannelNumber, frameMax: FrameSize, heartbeat: HeartbeatInterval

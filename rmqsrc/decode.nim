@@ -139,6 +139,18 @@ proc decodeConnectionStart(data: Stream): Method =
     versionMajor, versionMinor, serverPropertiesTable, mechanisms, locales
   )
 
+proc decodeConnectionStartOk(data: Stream): Method =
+  let
+    serverPropertiesNode = data.decodeValue(typeChr = 'F')
+    serverPropertiesTable = zip(serverPropertiesNode.keys, serverPropertiesNode.values).toTable
+    mechanisms = data.decodeValue(typeChr = 's').shortStrValue
+    response = data.decodeValue(typeChr = 'S').longStrValue
+    locales = data.decodeValue(typeChr = 's').shortStrValue
+
+  result = initMethodStartOk(
+    serverPropertiesTable, mechanisms, response, locales
+  )
+
 proc decodeTune(data: Stream): Method =
   let
     channelMax = data.readChannelNumber
@@ -164,6 +176,7 @@ proc decodeMethod(data: Stream): Method =
 
   case methodId
   of mStart: data.decodeConnectionStart()
+  of mStartOk: data.decodeConnectionStartOk()
   of mTune: data.decodeTune()
   of mCloseOk: data.decodeCloseOk()
   of mOpenOk: data.decodeOpenOk()

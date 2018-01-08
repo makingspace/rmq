@@ -36,8 +36,7 @@ const
     6, 51, 46, 54, 46, 49, 52, 0, 0, 0, 14, 80, 76, 65, 73, 78, 32, 65,
     77, 81, 80, 76, 65, 73, 78, 0, 0, 0, 5, 101, 110, 95, 85, 83, 206
   ].mapIt(it.char).join()
-  serverPropertiesTableSize = 449
-  capabilitiesTableSize = 199
+
   expectedCapabilities = @[
     "authentication_failure_close", "basic.nack", "connection.blocked",
     "consumer_cancel_notify", "consumer_priorities", "direct_reply_to",
@@ -79,6 +78,8 @@ suite "connection tests":
     check expectedCapabilities == c.serverProperties["capabilities"].keys.sorted(system.cmp)
     check expectedCapabilitiesValuesTypes == c.serverProperties["capabilities"].values.mapIt(it.valueType)
 
+suite "decoding":
+
   test "handle Connection.OpenOk":
     const response = @[
       0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x0a, 0x00, 0x29, 0x00, 0xce
@@ -106,7 +107,12 @@ suite "encoding":
         rpcMethod: m
       )
 
-    const expectedMarshaled = @['\x01', '\x00', '\x01', '\x00', '\x00', '\x00', '$', '\x00', '\x0A', '\x00', '\x0B', '\x00', '\x00', '\x00', '\x00', '\x05', 'P', 'L', 'A', 'I', 'N', '\x00', '\x00', '\x00', '\x0C', 'u', 's', 'e', 'r', 'p', 'a', 's', 's', 'w', 'o', 'r', 'd', '\x05', 'e', 'n', '_', 'U', 'S', '\xCE']
+    const expectedMarshaled = @[
+      '\x01', '\x00', '\x01', '\x00', '\x00', '\x00', '$', '\x00', '\x0A',
+      '\x00', '\x0B', '\x00', '\x00', '\x00', '\x00', '\x05', 'P', 'L', 'A',
+      'I', 'N', '\x00', '\x00', '\x00', '\x0C', 'u', 's', 'e', 'r', 'p', 'a',
+      's', 's', 'w', 'o', 'r', 'd', '\x05', 'e', 'n', '_', 'U', 'S', '\xCE'
+    ]
 
     check f.marshal() == expectedMarshaled.join()
 
@@ -121,13 +127,15 @@ suite "encoding":
       true == node.values[0].boolValue
 
     const expectedBytes = @[
-      0.chr, 0.chr, 0.chr, 9.chr, 6.chr, 99.chr, 97.chr, 110.chr, 70.chr, 111.chr, 111.chr, 116.chr, 1.chr
+      0.chr, 0.chr, 0.chr, 9.chr, 6.chr, 99.chr, 97.chr, 110.chr, 70.chr,
+      111.chr, 111.chr, 116.chr, 1.chr
     ]
+
     let
       simpleTable = {"canFoo": true.toNode}.toTable.toNode
       simpleEncoded = simpleTable.encode()
-    check simpleEncoded == expectedBytes
 
+    check simpleEncoded == expectedBytes
 
     let
       encoded = node.encode().join().newStringStream
@@ -141,30 +149,57 @@ suite "encoding":
 
 suite "codec":
 
+  setUp:
+    let
+      sampleProperties = {"capabilities": {"canFoo": true.toNode}.toTable.toNode}.toTable
+      mechanisms = "PLAIN"
+      response = "userpassword"
+      locales = "en_US"
+
+  proc reDecode(f: Frame): Frame =
+    f.marshal().decode()[1].get()
+
   test "Protocol":
     let
       f = initProtocolHeader(0.char, 9.char, 1.char)
-      decoded = f.marshal().decode()[1].get()
+      decoded = f.reDecode
 
     check:
       f.major == decoded.major
       f.minor == decoded.minor
       f.revision == decoded.revision
 
+  template checkSharedStartParams() =
+    check:
+      @["canFoo"] == fParams.serverProperties["capabilities"].keys
+      @["canFoo"] == decodedParams.serverProperties["capabilities"].keys
+      true == fParams.serverProperties["capabilities"].values[0].boolValue
+      true == decodedParams.serverProperties["capabilities"].values[0].boolValue
+      mechanisms == fParams.mechanisms
+      mechanisms == decodedParams.mechanisms
+      locales == fParams.locales
+      locales == decodedParams.locales
+
   test "Connection.Start":
     let
-      properties = {"capabilities": {"canFoo": true.toNode}.toTable.toNode}.toTable
-      f = initMethod(0, initMethodStart(0, 9, properties, "PLAIN", "en_US"))
-      decoded = f.marshal().decode()[1].get()
+      f = initMethod(0, initMethodStart(0, 9, sampleProperties, "PLAIN", "en_US"))
+      decoded = f.reDecode
       fParams = f.rpcMethod.mStartParams
       decodedParams = decoded.rpcMethod.mStartParams
 
     check:
       fParams.versionMajor == decodedParams.versionMajor
       fParams.versionMinor == decodedParams.versionMinor
-      @["canFoo"] == fParams.serverProperties["capabilities"].keys
-      @["canFoo"] == decodedParams.serverProperties["capabilities"].keys
-      true == fParams.serverProperties["capabilities"].values[0].boolValue
-      true == decodedParams.serverProperties["capabilities"].values[0].boolValue
-      fParams.mechanisms == decodedParams.mechanisms
-      fParams.locales == decodedParams.locales
+
+    checkSharedStartParams()
+
+  test "Connection.StartOk":
+    let
+      f = initMethod(0, initMethodStartOk(sampleProperties, mechanisms, response, locales))
+      decoded = f.reDecode
+      fParams = f.rpcMethod.mStartOkParams
+      decodedParams = decoded.rpcMethod.mStartOkParams
+
+    check fParams.response == response
+    check decodedParams.response == response
+    checkSharedStartParams()
