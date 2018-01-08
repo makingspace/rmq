@@ -150,7 +150,7 @@ suite "encoding":
 suite "codec":
 
   setUp:
-    const
+    let
       sampleProperties = {"capabilities": {"canFoo": true.toNode}.toTable.toNode}.toTable
       mechanisms = "PLAIN"
       response = "userpassword"
@@ -186,7 +186,6 @@ suite "codec":
       decoded = f.reDecode
       fParams = f.rpcMethod.mStartParams
       decodedParams = decoded.rpcMethod.mStartParams
-
     check:
       fParams.versionMajor == decodedParams.versionMajor
       fParams.versionMinor == decodedParams.versionMinor
