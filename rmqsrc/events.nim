@@ -13,9 +13,6 @@ proc handleRead(connection: Connection) {.async.} =
     info "Socket timeout on read."
 
 proc manageEventState(connection: Connection) =
-  info "$# Managing state. Events: $3 Frames waiting?: $2" % [
-    $connection, $connection.framesWaiting, $connection.events
-  ]
   if connection.framesWaiting:
     connection.scheduleWrite()
   else:
@@ -23,8 +20,6 @@ proc manageEventState(connection: Connection) =
 
 proc handleEvents*(connection: Connection) {.async.} =
   let events = connection.events
-
-  info "$# Handling events: $#" % [$connection, $events]
 
   if connection.connected and ceWrite in events:
     await connection.handleWrite()

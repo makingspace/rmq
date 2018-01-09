@@ -39,7 +39,7 @@ when isMainModule:
       continue
 
   let
-    params = (host: host, port: port, username: username, password: password)
+    params = initConnectionParameters(host, port, username, password)
     connection = newConnection(params)
 
   proc closeHandler() {.noconv.} = connection.close()

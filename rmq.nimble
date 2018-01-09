@@ -7,14 +7,18 @@ license       = "BSD3"
 srcDir        = "src"
 
 # Dependencies
-
 requires "nim >= 0.17.2"
+
+import strutils
+proc runApp(release = false) =
+    let cmd = "nim c -r $# rmq" % (if release: "-d:release" else: "")
+    exec cmd
 
 task tests, "Run test suite":
     exec "nim c -r tests"
 
 task app, "Start AMQP client":
-    exec "nim c -r rmq"
+    runApp()
 
 task release, "Start AMQP client (release mode)":
-    exec "nim c -r -d:release rmq"
+    runApp(release = true)
